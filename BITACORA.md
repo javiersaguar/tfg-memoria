@@ -50,10 +50,10 @@
 - **Autoría (REGLA ESTRICTA):** todos los commits son exclusivamente de Javier Saguar <javisaguarantona@gmail.com>. **Ningún agente de IA debe figurar como autor ni co-autor**: prohibido añadir `Co-Authored-By`, "Generated with", "Assisted by" o cualquier atribución similar en mensajes de commit, PRs o código. Ninguna IA debe ejecutar `git commit`/`git push` de forma autónoma; los comandos se proponen y los ejecuta Javier. Guardián técnico: hook `.githooks/commit-msg` (activar tras clonar con `git config core.hooksPath .githooks`).
 
 ## 4. Estado actual
-- **Fase:** F2 — evaluador de reglas Sigma operativo.
-- **Hecho:** cargador (`detection/loader.py`) y evaluador en memoria (`detection/evaluator.py`) funcionando. **2.093 reglas cargadas con 0 errores** aplicando la pipeline OCSF propia. Validación sobre el dataset LSASS: **10 alertas, 0 falsos positivos**, procedentes de 5 reglas independientes de 3 categorías distintas, todas coherentes con T1003.001. Optimizado con precompilación del árbol de condiciones + enrutado por logsource: **de 108,6 s a 1,49 s (73×)** sin alterar resultados → 124 eventos/s contra 2.093 reglas.
-- **En curso:** cerrar sesión.
-- **Siguiente:** job de streaming `norm.events → det.alerts` con el esquema de alerta; después matriz de cobertura ATT&CK.
+- **Fase:** F2 — detección en streaming operativa, validada con volumen realista.
+- **Hecho:** job `detect_job.py` (`norm.events → det.alerts`) con esquema de alerta y `matched_fields` como semilla de explicabilidad. **Dataset apt29 day1 cargado: 196.081 eventos.** Ampliados los mapeadores (PowerShell 4104/4103/800 → Script Activity 1009; Sysmon 2/8/9/18/23; Security privilegios, logoff, política de auditoría): cobertura **89,5% → 95,0% → 99,4%**, con 25 clases OCSF distintas. Coincidencia exacta batch/streaming.
+- **En curso:** primera ejecución de detección sobre apt29.
+- **Siguiente:** analizar las alertas de apt29; matriz de cobertura ATT&CK; sink de `det.alerts` a ClickHouse; después ML-1 (anomalías).
 
 
 ## 5. Estructura del repo
@@ -213,3 +213,21 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Problemas / pendiente:** dos incompatibilidades con pySigma 1.4.0: `SigmaRegularExpression.regexp` no es cadena plana (requiere `str()`), y los comodines son `SpecialChars.WILDCARD_MULTI/SINGLE`, no clases con nombre. Ambas resueltas.
 - **Siguiente paso:** job de streaming hacia `det.alerts`.
 - **Archivos tocados:** `detection/{loader,evaluator}.py` (nuevos), `BITACORA.md`.
+
+
+### 2026-07-27 — F2: detección en streaming y salto a volumen realista
+- **Con qué/quién:** Claude (chat).
+- **Objetivo:** poner la detección en el pipeline y validarla con datos serios.
+- **Hecho:** `pipeline/jobs/detect_job.py` consumiendo `norm.events` y publicando en `det.alerts`; consumidor por grupo (permite paralelizar por partición). Verificadas 10 alertas idénticas a la prueba en memoria; alerta de ejemplo con el comando literal del atacante en `matched_fields`. Cargado apt29 day1 (196.081 eventos, 368 MB): replay a 3.044 ev/s, normalización 99,4%. Nuevos mapeadores: PowerShell (Script Activity 1009, 10.766 eventos), Sysmon 2/8/9/18/23, Security 4672/4673/4703/4634/4627/4670/4945/5447/5154/5145.
+- **Decisiones:** cobertura cerrada en 99,4%; los 1.252 eventos restantes son cola larga (<100 apariciones cada tipo) con rendimiento decreciente claro. Nuevas señales precalculadas: timestomp, remote_thread, raw_disk_access, pipe_name, special_privileges, ps_suspicious, ps_encoded.
+- **Problemas / pendiente:** rendimiento de detección ~140 ev/s con 2.093 reglas → ~25 min para apt29. Vía de mejora identificada: paralelizar instancias del job por partición (el consumidor ya está preparado).
+- **Siguiente paso:** analizar alertas de apt29; matriz de cobertura ATT&CK.
+- **Archivos tocados:** `pipeline/jobs/detect_job.py` (nuevo), `pipeline/normalize/powershell.py` (nuevo), `pipeline/normalize/{sysmon,winsecurity,registry}.py`, `BITACORA.md`.
+- **Resultados apt29 day1:** 741 alertas sobre 195.197 eventos (0,39%), 0 a DLQ.
+  **4 hosts** (SCRANTON 606, NASHUA 117, NEWYORK 16, UTICA 2) → desbloquea el patrón de
+  movimiento lateral. **33 técnicas ATT&CK** distintas, incluidas T1003.001, T1547.001
+  (persistencia), T1048.003 (exfiltración). CobaltStrike detectado (129 alertas).
+  Regla dominante: "Binary Or Script Dropper Via PowerShell" con 292 (39% del total)
+  → candidata a análisis de falsos positivos y caso de uso claro para la agrupación del Pilar A.
+  **Línea base de reducción de alertas: 741.**
+  Rendimiento: 78 ev/s con 2.093 reglas (~163.000 evaluaciones/s), 42 min para el dataset.
