@@ -50,10 +50,10 @@
 - **Autoría (REGLA ESTRICTA):** todos los commits son exclusivamente de Javier Saguar <javisaguarantona@gmail.com>. **Ningún agente de IA debe figurar como autor ni co-autor**: prohibido añadir `Co-Authored-By`, "Generated with", "Assisted by" o cualquier atribución similar en mensajes de commit, PRs o código. Ninguna IA debe ejecutar `git commit`/`git push` de forma autónoma; los comandos se proponen y los ejecuta Javier. Guardián técnico: hook `.githooks/commit-msg` (activar tras clonar con `git config core.hooksPath .githooks`).
 
 ## 4. Estado actual
-- **Fase:** F2 — detección en streaming operativa, validada con volumen realista.
-- **Hecho:** job `detect_job.py` (`norm.events → det.alerts`) con esquema de alerta y `matched_fields` como semilla de explicabilidad. **Dataset apt29 day1 cargado: 196.081 eventos.** Ampliados los mapeadores (PowerShell 4104/4103/800 → Script Activity 1009; Sysmon 2/8/9/18/23; Security privilegios, logoff, política de auditoría): cobertura **89,5% → 95,0% → 99,4%**, con 25 clases OCSF distintas. Coincidencia exacta batch/streaming.
-- **En curso:** primera ejecución de detección sobre apt29.
-- **Siguiente:** analizar las alertas de apt29; matriz de cobertura ATT&CK; sink de `det.alerts` a ClickHouse; después ML-1 (anomalías).
+- **Fase:** F2.2 — ML-1 (detección de anomalías) con primer resultado.
+- **Hecho:** sink de alertas a ClickHouse (771). Cargados **105 datasets** (apt29 day1+day2 y ~102 atómicos): **1.224.849 eventos únicos, 25 hosts, 26 clases OCSF, 56 técnicas ATT&CK**, cobertura 99,2–99,6%. Extracción de características por ventana (29 features, 420 ventanas de 5 min). **Isolation Forest evaluado sobre apt29 day1 (excluido del entrenamiento): AUC-ROC 0,979** entrenando solo con ventanas limpias, frente a 0,933 asumiendo contaminación.
+- **En curso:** cerrar sesión.
+- **Siguiente:** prueba de robustez sin las señales precalculadas; registrar en MLflow; nivel por evento como comparación. Pendiente: laboratorio de emulación para generar datos propios con verdad conocida.
 
 
 ## 5. Estructura del repo
@@ -241,3 +241,13 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Problemas / pendiente:** (1) reprocesar las alertas con la clasificación corregida (42 min de detección). (2) **Verificar `T1685` en attack.mitre.org** antes de citarlo: aparece en reglas de evasión defensiva y no encaja con lo esperado.
 - **Siguiente paso:** matriz de cobertura ATT&CK; después Pilar A (CEP).
 - **Archivos tocados:** `infra/clickhouse/init/02_alerts.sql`, `pipeline/jobs/sink_alerts.py` (nuevos), `detection/loader.py`, `BITACORA.md`.
+
+
+### 2026-07-27 (3) — F2.2: ML-1, detector de anomalías
+- **Con qué/quién:** Claude (chat).
+- **Objetivo:** primer componente de aprendizaje automático del sistema.
+- **Hecho:** cargador masivo `load_atomics.py` (108/155 datasets; los 47 restantes son capturas de red, no host). Total: 1,22 M eventos únicos de 105 datasets. Extractor de características por ventana y entrenamiento comparando dos estrategias. **Resultado: AUC-ROC 0,979 / AUC-PR 0,981** con entrenamiento solo sobre ventanas limpias; las 5 ventanas más anómalas coinciden con las de mayor número de alertas Sigma, sin que el modelo las haya visto.
+- **Decisiones:** nivel de agregación = ventana de host (5 min), por su encaje con el problema multi-etapa; 420 ventanas frente a las 60 iniciales gracias a la carga de atómicos. Entrenamiento no supervisado excluyendo apt29 day1, que se reserva para evaluación con las alertas Sigma como referencia externa. **Menos datos pero limpios superan a más datos contaminados** (0,979 vs 0,933).
+- **Problemas / pendiente:** (1) solo 28 ventanas de evaluación → incertidumbre alta en la métrica. (2) Posible circularidad: las señales `signal_*` participan tanto en las características como en la definición de "ventana limpia"; comprobar robustez sin ellas. (3) El sink no es idempotente → duplicados; resuelto con tabla `events_dedup`, pendiente pasar a ReplacingMergeTree. (4) IPv6 en apt29 obligó a cambiar `dst_ip` de IPv4 a IPv6.
+- **Siguiente paso:** ablación sin señales; MLflow; laboratorio de emulación.
+- **Archivos tocados:** `pipeline/load_atomics.py`, `pipeline/jobs/sink_alerts.py`, `ml/anomaly/{features,explore,train}.py`, `infra/clickhouse/init/02_alerts.sql`, `BITACORA.md`.
