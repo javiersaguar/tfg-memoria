@@ -251,3 +251,12 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Problemas / pendiente:** (1) solo 28 ventanas de evaluación → incertidumbre alta en la métrica. (2) Posible circularidad: las señales `signal_*` participan tanto en las características como en la definición de "ventana limpia"; comprobar robustez sin ellas. (3) El sink no es idempotente → duplicados; resuelto con tabla `events_dedup`, pendiente pasar a ReplacingMergeTree. (4) IPv6 en apt29 obligó a cambiar `dst_ip` de IPv4 a IPv6.
 - **Siguiente paso:** ablación sin señales; MLflow; laboratorio de emulación.
 - **Archivos tocados:** `pipeline/load_atomics.py`, `pipeline/jobs/sink_alerts.py`, `ml/anomaly/{features,explore,train}.py`, `infra/clickhouse/init/02_alerts.sql`, `BITACORA.md`.
+
+### 2026-07-27 (4) — ML-1: prueba de robustez y hallazgo metodológico
+- **Con qué/quién:** Claude (chat).
+- **Objetivo:** comprobar si el detector depende de características circulares.
+- **Hecho:** ablación excluyendo las 8 características que participan en la definición de "ventana limpia" (señales `signal_*`, inyecciones, severidad). Resultados sobre apt29 day1: A (29 feats, limpias) 0,979 · C (21 feats, sin circulares) **1,0** · D (todo, sin circulares) 0,923 · **E (control, solo `n_eventos`) 0,941**.
+- **Decisiones:** **circularidad descartada** — quitar las señales no empeora, mejora. Pero el control E revela que la capacidad discriminante procede mayoritariamente del **volumen de eventos**: las ventanas con alerta tienen mediana de 6.302 eventos frente a 785 las benignas (8×), con solapamiento mínimo (874–2.402). El AUC de 1,0 es indicio de tarea trivialmente separable, no de modelo excelente.
+- **Problemas / pendiente:** la separabilidad es probablemente un **artefacto del dataset** (el ataque se ejecuta en ráfagas de actividad intensa), no una propiedad generalizable. **Refuerza la necesidad del laboratorio de emulación**: hacen falta horas de actividad benigna con volumen comparable al del ataque para una validación creíble. Pendiente: características normalizadas por volumen; variante supervisada con SMOTE para comparar (16 positivos vs 404 negativos).
+- **Siguiente paso:** laboratorio de emulación (sesión larga); MLflow; ML-1 supervisado con SMOTE.
+- **Archivos tocados:** `ml/anomaly/train.py`, `BITACORA.md`.
