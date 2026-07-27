@@ -50,10 +50,10 @@
 - **Autoría (REGLA ESTRICTA):** todos los commits son exclusivamente de Javier Saguar <javisaguarantona@gmail.com>. **Ningún agente de IA debe figurar como autor ni co-autor**: prohibido añadir `Co-Authored-By`, "Generated with", "Assisted by" o cualquier atribución similar en mensajes de commit, PRs o código. Ninguna IA debe ejecutar `git commit`/`git push` de forma autónoma; los comandos se proponen y los ejecuta Javier. Guardián técnico: hook `.githooks/commit-msg` (activar tras clonar con `git config core.hooksPath .githooks`).
 
 ## 4. Estado actual
-- **Fase:** F2.2 — ML-1 (detección de anomalías) con primer resultado.
-- **Hecho:** sink de alertas a ClickHouse (771). Cargados **105 datasets** (apt29 day1+day2 y ~102 atómicos): **1.224.849 eventos únicos, 25 hosts, 26 clases OCSF, 56 técnicas ATT&CK**, cobertura 99,2–99,6%. Extracción de características por ventana (29 features, 420 ventanas de 5 min). **Isolation Forest evaluado sobre apt29 day1 (excluido del entrenamiento): AUC-ROC 0,979** entrenando solo con ventanas limpias, frente a 0,933 asumiendo contaminación.
+- **Fase:** F2.2 — ML-1 (detección de anomalías) evaluado con controles.
+- **Hecho:** 105 datasets cargados (1,22 M eventos únicos, 25 hosts, 26 clases OCSF). Detector de anomalías por ventana con 42 características (26 absolutas + 16 relativas). **Evaluación con controles sobre apt29 day1** (excluido del entrenamiento): conjunto completo 0,995 · solo volumen 0,941 · solo ratios 0,867 · ratios con datos contaminados 0,533. Circularidad descartada por ablación.
 - **En curso:** cerrar sesión.
-- **Siguiente:** prueba de robustez sin las señales precalculadas; registrar en MLflow; nivel por evento como comparación. Pendiente: laboratorio de emulación para generar datos propios con verdad conocida.
+- **Siguiente:** registrar en MLflow; variante supervisada con SMOTE; **laboratorio de emulación** (sesión larga) para validación robusta. Después: matriz de cobertura ATT&CK y Pilar A.
 
 
 ## 5. Estructura del repo
@@ -260,3 +260,25 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Problemas / pendiente:** la separabilidad es probablemente un **artefacto del dataset** (el ataque se ejecuta en ráfagas de actividad intensa), no una propiedad generalizable. **Refuerza la necesidad del laboratorio de emulación**: hacen falta horas de actividad benigna con volumen comparable al del ataque para una validación creíble. Pendiente: características normalizadas por volumen; variante supervisada con SMOTE para comparar (16 positivos vs 404 negativos).
 - **Siguiente paso:** laboratorio de emulación (sesión larga); MLflow; ML-1 supervisado con SMOTE.
 - **Archivos tocados:** `ml/anomaly/train.py`, `BITACORA.md`.
+
+### 2026-07-27 (4) — ML-1: evaluación con controles y ablaciones
+- **Con qué/quién:** Claude (chat).
+- **Objetivo:** determinar si el detector aprende algo más que el volumen de actividad.
+- **Hecho:** ampliadas las características a 42, separadas en absolutas (26) y relativas (16, proporciones independientes del volumen por construcción). Ejecutados siete experimentos sobre apt29 day1:
+  | Estrategia | Feats | AUC-ROC |
+  |---|---|---|
+  | A: limpias, todas | 42 | 0,995 |
+  | C: limpias, sin circulares | 34 | 0,995 |
+  | E: control, solo `n_eventos` | 1 | 0,941 |
+  | F: limpias, solo ratios | 16 | 0,867 |
+  | B: contaminado, todas | 42 | 0,913 |
+  | D: contaminado, sin circulares | 34 | 0,851 |
+  | G: contaminado, solo ratios | 16 | 0,533 |
+- **Decisiones y hallazgos:**
+  1. **Circularidad descartada:** excluir las señales que definen "ventana limpia" no degrada el resultado (0,995 en ambos casos).
+  2. **Volumen y perfil son complementarios:** el control de volumen alcanza 0,941 y los ratios 0,867 de forma independiente; combinados llegan a 0,995. Esto justifica el enfoque multivariante frente a una regla de umbral simple.
+  3. **La pureza del entrenamiento es crítica:** con las mismas 16 características relativas, entrenar con datos limpios da 0,867 y con datos contaminados 0,533 (azar).
+  4. Se establece el **control de volumen (0,941) como línea base permanente** para la evaluación de F7.
+- **Problemas / pendiente:** solo 28 ventanas de evaluación → incertidumbre alta. La separabilidad por volumen es en parte artefacto de los datasets (el ataque se ejecuta en ráfagas, sin actividad de fondo sostenida). **Motiva el laboratorio de emulación** como requisito para una validación creíble.
+- **Siguiente paso:** MLflow; ML-1 supervisado con SMOTE (16 positivos vs 404 negativos); laboratorio de emulación.
+- **Archivos tocados:** `ml/anomaly/{features,train}.py`, `BITACORA.md`.

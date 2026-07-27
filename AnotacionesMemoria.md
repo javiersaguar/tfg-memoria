@@ -25,3 +25,8 @@ ClickHouse en contenedor no acepta conexiones desde el host aunque el puerto est
 25-07-2026
 
 Sincronización temporal entre fuentes de telemetría. Sysmon y el canal Security de Windows exponen campos de tiempo distintos: Sysmon incluye `UtcTime` además de `TimeCreated`, mientras que Security solo aporta `TimeCreated`. Priorizar `UtcTime` cuando existe introduce un desfase entre canales (16 horas en los datasets utilizados), que reordena los eventos de forma incoherente y rompería la correlación multi-etapa: la última etapa del ataque aparecía como la primera. La normalización debe apoyarse en el campo común y coherente entre fuentes (`TimeCreated`), no en el aparentemente más preciso. El error es silencioso —no produce ningún fallo ni rechazo— y solo se detecta al inspeccionar la secuencia reconstruida.
+
+
+27-07-2026
+
+El detector alcanza un AUC de 0,995 empleando el conjunto completo de características. Un control basado únicamente en el volumen de eventos obtiene 0,941, mientras que un modelo que emplea exclusivamente características relativas —independientes del volumen por construcción— alcanza 0,867. Ambas fuentes de información resultan por tanto discriminantes de forma independiente, y su combinación las supera, lo que justifica el enfoque multivariante frente a una regla de umbral. La comparación entre las estrategias con datos limpios (0,867) y contaminados (0,533) sobre el mismo conjunto de características evidencia además la sensibilidad del método a la pureza del conjunto de entrenamiento.
