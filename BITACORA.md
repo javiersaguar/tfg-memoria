@@ -231,3 +231,13 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   → candidata a análisis de falsos positivos y caso de uso claro para la agrupación del Pilar A.
   **Línea base de reducción de alertas: 741.**
   Rendimiento: 78 ev/s con 2.093 reglas (~163.000 evaluaciones/s), 42 min para el dataset.
+
+
+  ### 2026-07-27 (2) — F2: persistencia de alertas y primeros análisis
+- **Con qué/quién:** Claude (chat).
+- **Objetivo:** volcar las alertas a ClickHouse y analizar los resultados de apt29.
+- **Hecho:** tabla `tfg.alerts` (técnicas como Array, ORDER BY host+time+regla) y sink `sink_alerts.py`; 771 alertas persistidas. Investigada la regla dominante: las 292 alertas de "Dropper Via PowerShell" son **una sola acción** (PowerShell descomprimiendo SysinternalsSuite en 8 min, un fichero por alerta) → detección legítima con granularidad inadecuada; caso de uso perfecto para el Pilar A. **Medida la línea base de reducción de alertas: 741 → 87 (88,3 %)** con agrupación ingenua (regla+host+ventana 10 min).
+- **Decisiones:** corregida la clasificación de etiquetas ATT&CK en `rule_summary()`: el repositorio de Sigma mezcla bajo `attack.` técnicas (tNNNN), software (sNNNN), grupos (gNNNN) y nombres de táctica no estándar de la comunidad (`defense-impairment`, `stealth`). Se separan en `techniques`, `tactics`, `software` y `other_tags` validando contra la lista oficial de tácticas.
+- **Problemas / pendiente:** (1) reprocesar las alertas con la clasificación corregida (42 min de detección). (2) **Verificar `T1685` en attack.mitre.org** antes de citarlo: aparece en reglas de evasión defensiva y no encaja con lo esperado.
+- **Siguiente paso:** matriz de cobertura ATT&CK; después Pilar A (CEP).
+- **Archivos tocados:** `infra/clickhouse/init/02_alerts.sql`, `pipeline/jobs/sink_alerts.py` (nuevos), `detection/loader.py`, `BITACORA.md`.
