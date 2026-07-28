@@ -50,10 +50,10 @@
 - **Autoría (REGLA ESTRICTA):** todos los commits son exclusivamente de Javier Saguar <javisaguarantona@gmail.com>. **Ningún agente de IA debe figurar como autor ni co-autor**: prohibido añadir `Co-Authored-By`, "Generated with", "Assisted by" o cualquier atribución similar en mensajes de commit, PRs o código. Ninguna IA debe ejecutar `git commit`/`git push` de forma autónoma; los comandos se proponen y los ejecuta Javier. Guardián técnico: hook `.githooks/commit-msg` (activar tras clonar con `git config core.hooksPath .githooks`).
 
 ## 4. Estado actual
-- **Fase:** F2.2 — ML-1 (detección de anomalías) evaluado con controles.
-- **Hecho:** 105 datasets cargados (1,22 M eventos únicos, 25 hosts, 26 clases OCSF). Detector de anomalías por ventana con 42 características (26 absolutas + 16 relativas). **Evaluación con controles sobre apt29 day1** (excluido del entrenamiento): conjunto completo 0,995 · solo volumen 0,941 · solo ratios 0,867 · ratios con datos contaminados 0,533. Circularidad descartada por ablación.
+- **Fase:** **F2 COMPLETADA**. Detección con reglas + ML-1 evaluado y registrado.
+- **Hecho:** matriz de cobertura ATT&CK generada (formato Navigator): **300 técnicas cubiertas** por 2.301 reglas, de las cuales 34 observadas en los datasets → **tasa de activación 11,3 %**. MLflow desplegado (perfil `mlops`) con **10 experimentos** de ML-1 registrados y comparables: no supervisado (Isolation Forest), supervisado (Random Forest) y variantes con SMOTE.
 - **En curso:** cerrar sesión.
-- **Siguiente:** registrar en MLflow; variante supervisada con SMOTE; **laboratorio de emulación** (sesión larga) para validación robusta. Después: matriz de cobertura ATT&CK y Pilar A.
+- **Siguiente:** **Pilar A (F3)** — detección multi-etapa con CEP. Pendiente en paralelo: laboratorio de emulación para validación robusta.
 
 
 ## 5. Estructura del repo
@@ -282,3 +282,29 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Problemas / pendiente:** solo 28 ventanas de evaluación → incertidumbre alta. La separabilidad por volumen es en parte artefacto de los datasets (el ataque se ejecuta en ráfagas, sin actividad de fondo sostenida). **Motiva el laboratorio de emulación** como requisito para una validación creíble.
 - **Siguiente paso:** MLflow; ML-1 supervisado con SMOTE (16 positivos vs 404 negativos); laboratorio de emulación.
 - **Archivos tocados:** `ml/anomaly/{features,train}.py`, `BITACORA.md`.
+
+### 2026-07-28 — F2: cobertura ATT&CK y experimentos en MLflow
+- **Con qué/quién:** Claude (chat).
+- **Objetivo:** cerrar F2 con la matriz de cobertura y el registro reproducible de ML-1.
+- **Hecho:**
+  1. **Matriz de cobertura ATT&CK** (`detection/coverage_matrix.py`): genera dos capas en formato Navigator — potencial (300 técnicas, 177 subtécnicas, sobre 2.301 reglas) y observada (34 técnicas). Tasa de activación 11,3 %: hay 266 técnicas con detección disponible que ningún dataset ha ejercitado, lo que **motiva el laboratorio de emulación**. 238 reglas (10 %) carecen de etiqueta ATT&CK.
+  2. **MLflow** desplegado y 10 experimentos registrados:
+  | Enfoque | AUC-ROC | AUC-PR | F1 |
+  |---|---|---|---|
+  | IF limpias, todas | 0,995 | 0,996 | — |
+  | IF limpias, sin circulares | 0,995 | 0,996 | — |
+  | Control solo volumen | 0,941 | 0,920 | — |
+  | RF sin SMOTE, sin circulares | 0,923 | 0,882 | 0,750 |
+  | RF + SMOTE, solo ratios | 0,913 | 0,869 | 0,698 |
+  | IF contaminado, todas | 0,913 | 0,919 | — |
+  | IF limpias, solo ratios | 0,867 | 0,806 | — |
+  | RF + SMOTE, sin circulares | 0,864 | 0,829 | 0,698 |
+  | RF sin SMOTE, solo ratios | 0,854 | 0,798 | 0,732 |
+  | IF contaminado, solo ratios | 0,533 | 0,646 | — |
+- **Hallazgos:**
+  1. **SMOTE ayuda con pocas características y estorba con muchas:** solo ratios 0,854 → 0,913; sin circulares 0,923 → 0,864. Coherente con la interpolación de SMOTE en espacios de alta dimensión.
+  2. **El no supervisado supera al supervisado** (0,995 vs 0,923): el supervisado aprende de etiquetas heurísticas, el no supervisado de la distribución real de lo normal.
+  3. `stealth` **sí es táctica** en ATT&CK v19 (renombra a `defense-evasion`); corregida la lista en `loader.py`.
+- **Problemas / pendiente:** en el conjunto supervisado la clase "ataque" es **mayoritaria** (260 vs 132), al contrario que en un escenario real; SMOTE sobremuestrea la clase equivocada respecto a producción. Limitación propia de los datasets de laboratorio, a documentar.
+- **Siguiente paso:** F3, Pilar A (CEP).
+- **Archivos tocados:** `detection/coverage_matrix.py`, `ml/anomaly/train_mlflow.py` (nuevos), `detection/loader.py`, `infra/docker-compose.yml`, `BITACORA.md`.
