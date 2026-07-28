@@ -183,14 +183,33 @@ sobre una estación de trabajo:
     invitado sin aportar aislamiento adicional relevante para este caso de uso.
 \end{itemize}
 
-\subsection{Uso del aprendizaje automático}
+\subsection{Papel del aprendizaje automático}
 
-Se establece como restricción de diseño que el aprendizaje automático se emplee
-exclusivamente en modo \textbf{inferencia}, sobre modelos preentrenados, admitiéndose como
-máximo un ajuste fino ligero de modelos de pequeño tamaño. Esta decisión responde tanto a la
-restricción de recursos como a una consideración de fondo: el objeto del trabajo es la
-arquitectura de correlación y razonamiento, no el entrenamiento de modelos, y desplazar el
-esfuerzo hacia esto último habría desdibujado la contribución.
+El aprendizaje automático se incorpora \textbf{únicamente allí donde aporta capacidades que
+el enfoque simbólico no cubre}. Este criterio descarta expresamente los modelos que
+duplicarían funciones ya resueltas: un clasificador que replicase el comportamiento de una
+regla de detección añadiría opacidad sin ganar cobertura.
+
+Bajo ese principio se identifican cuatro puntos de aplicación:
+
+\begin{enumerate}
+    \item \textbf{Detección de anomalías} sobre el flujo normalizado, que complementa a las
+    reglas señalando comportamiento inusual sin regla asociada.
+    \item \textbf{Extracción de técnicas} a partir de informes de amenazas en lenguaje
+    natural, tarea inabordable mediante reglas.
+    \item \textbf{Aprendizaje sobre el grafo de ataque}, para sugerir rutas de progresión no
+    contempladas explícitamente por las reglas de interacción.
+    \item \textbf{Ajuste del modelo de puntuación} a partir de datos, en lugar de pesos
+    fijados manualmente.
+\end{enumerate}
+
+La restricción operativa es que el entrenamiento debe ser viable sobre la estación de
+trabajo descrita, lo que acota el tamaño de los modelos empleados pero no impide el ajuste
+fino de modelos del dominio ni el entrenamiento de modelos clásicos y de grafos.
+
+En todos los casos se preserva la explicabilidad mediante el principio expuesto en la
+Sección~\ref{sec:ml}: el componente estadístico propone y el simbólico verifica. Ninguna
+salida del sistema se presenta al analista sin una justificación inspeccionable.
 
 \section{Entorno de desarrollo}
 
@@ -569,10 +588,377 @@ hosts es inferior al de particiones.
 % ============================================================================
 
 \section{Detección basada en reglas}
-% TODO (F2): selección y curación del conjunto de reglas Sigma; construcción de la tabla de
-% equivalencia entre los campos nativos de las reglas y el modelo OCSF; implementación de la
-% evaluación en streaming y en lotes; esquema de alerta con los campos coincidentes como base
-% de la explicabilidad; matriz de cobertura ATT&CK resultante.
+\label{sec:deteccion-reglas}
+
+Sobre el flujo de eventos normalizados se construye la primera capa de detección, encargada
+de identificar técnicas adversarias individuales. Se apoya en el catálogo público de reglas
+Sigma descrito en la Sección~\ref{sec:sigma}, lo que permite aprovechar el trabajo de la
+comunidad en lugar de redactar reglas propias.
+
+\subsection{Traducción de las reglas al esquema canónico}
+
+La integración presenta un obstáculo no evidente: las reglas del repositorio público están
+escritas contra los nombres de campo \textbf{nativos} de Windows y Sysmon, mientras que el
+sistema opera sobre eventos ya normalizados a OCSF. Aplicarlas directamente resulta
+imposible, pues los campos que referencian no existen en el modelo canónico.
+
+La biblioteca pySigma \cite{pysigma} prevé este escenario mediante el concepto de
+\textit{pipeline de procesamiento}: una especificación declarativa que transforma las reglas
+para adaptarlas a un modelo de datos concreto. Existe una implementación oficial para OCSF,
+que se tomó como punto de partida.
+
+Su análisis reveló, no obstante, \textbf{tres desviaciones} respecto de la semántica del
+estándar que la hacían inaplicable al modelo de este trabajo:
+
+\begin{enumerate}
+    \item En los eventos de \textit{acceso a proceso}, el proceso origen se mapea al campo
+    correspondiente al \textbf{proceso padre}. La correspondencia es incorrecta: en este tipo
+    de evento el proceso origen no engendró al destino, sino que ejecuta una acción sobre él.
+    OCSF define para ello el concepto de \textit{actor}, que es la correspondencia adecuada.
+    \item Los eventos de \textit{carga de módulo} se clasifican como actividad de proceso con
+    actividad genérica, cuando el esquema define una clase específica para ello
+    (\textit{Module Activity}).
+    \item Los accesos a proceso se etiquetan con la actividad genérica «otros» en lugar de la
+    correspondiente a la apertura de un descriptor.
+\end{enumerate}
+
+La primera desviación produce detecciones incorrectas; las dos últimas impiden que las reglas
+lleguen siquiera a evaluarse, dado que la condición sobre el identificador de tipo de evento
+nunca se satisface.
+
+Se optó por \textbf{implementar una pipeline propia} en lugar de extender la oficial. El
+motivo es técnico: las condiciones que las pipelines añaden a las reglas se acumulan de forma
+conjuntiva, por lo que una corrección superpuesta habría exigido simultáneamente dos valores
+distintos del mismo campo, anulando toda posibilidad de coincidencia.
+
+La pipeline resultante cubre nueve categorías de origen y establece la correspondencia entre
+los campos nativos y el modelo OCSF del proyecto, dirigiendo al bloque de campos no mapeados
+aquellos sin equivalente en el esquema. Su desarrollo constituye, en la práctica, la
+implementación de un \textit{backend} de Sigma específico para este sistema.
+
+\subsection{Evaluación de las reglas}
+
+Para aplicar las reglas se plantearon dos vías. La primera consiste en \textbf{generar
+consultas} en el lenguaje del almacén analítico y ejecutarlas periódicamente; es directa,
+pero opera necesariamente en modo diferido. La segunda consiste en \textbf{evaluar la
+estructura de la regla directamente contra cada evento} en memoria, sin lenguaje intermedio,
+lo que permite el funcionamiento en tiempo real.
+
+Se implementaron ambas: la primera como validación cruzada y la segunda como componente
+operativo del sistema.
+
+\subsubsection{Alcance de los modificadores soportados}
+
+El formato Sigma admite un conjunto amplio de modificadores que alteran la comparación de
+valores. Implementarlos todos constituiría un proyecto en sí mismo, por lo que se acotó el
+alcance a partir de una medición sobre el repositorio completo de reglas.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|r|r|}
+\hline
+\textbf{Modificador} & \textbf{Apariciones} & \textbf{Acumulado} \\
+\hline
+\texttt{contains}    & 3.362 & 45{,}1\,\% \\
+\texttt{endswith}    & 2.494 & 78{,}5\,\% \\
+\texttt{all}         &   854 & 90{,}0\,\% \\
+\texttt{startswith}  &   431 & 95{,}8\,\% \\
+\texttt{re}          &   155 & 97{,}9\,\% \\
+\hline
+Resto (\texttt{windash}, \texttt{cidr}, otros) & 158 & 100\,\% \\
+\hline
+\end{tabular}
+\caption{Frecuencia de uso de los modificadores de Sigma en el repositorio público.}
+\label{tab:modificadores}
+\end{table}
+
+Cinco modificadores cubren el 97,9\,\% de los usos reales. El evaluador los implementa
+todos, junto con la lógica de composición de condiciones (conjunción, disyunción, negación
+y cuantificación). Las construcciones no soportadas se detectan explícitamente y la regla
+correspondiente se omite, en lugar de producir una evaluación silenciosamente incorrecta.
+
+\subsubsection{Optimización}
+
+La implementación inicial reconstruía el árbol de condiciones de cada regla en cada
+evaluación. Sobre un conjunto de 2.093 reglas, ello suponía repetir más de 385.000 veces un
+trabajo que puede realizarse una sola vez por regla.
+
+Se introdujeron dos optimizaciones:
+
+\begin{itemize}
+    \item \textbf{Precompilación}: el árbol de condiciones se construye una única vez al
+    cargar la regla.
+    \item \textbf{Encaminamiento por tipo de evento}: cada regla declara la categoría de
+    registro sobre la que aplica, lo que permite descartar de antemano aquellas que no pueden
+    coincidir con el tipo del evento evaluado.
+\end{itemize}
+
+El efecto combinado se muestra en la Tabla~\ref{tab:optimizacion}. La comprobación esencial
+es que el conjunto de detecciones producidas permaneció \textbf{idéntico}: se trata de una
+optimización, no de una aproximación.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|r|r|r|}
+\hline
+\textbf{Versión} & \textbf{Tiempo} & \textbf{Mejora} & \textbf{Detecciones} \\
+\hline
+Sin optimizar & 108{,}6 s & --- & 10 \\
+Optimizada    & 1{,}49 s & 73$\times$ & 10 \\
+\hline
+\end{tabular}
+\caption{Efecto de las optimizaciones sobre el conjunto de referencia (184 eventos, 2.093 reglas).}
+\label{tab:optimizacion}
+\end{table}
+
+\subsection{Esquema de alerta}
+
+Cada coincidencia produce una alerta que incorpora la identificación de la regla, su nivel de
+severidad, las técnicas y tácticas de ATT\&CK asociadas, el dispositivo y usuario implicados,
+la referencia al evento de origen y la trazabilidad al conjunto de datos.
+
+El campo determinante es \texttt{matched\_fields}, que registra \textbf{qué condiciones
+concretas dispararon la detección} con sus valores. Constituye la base de la explicabilidad
+exigida por el requisito RNF6: la alerta no se limita a afirmar que algo es sospechoso, sino
+que aporta la evidencia. A modo de ilustración, sobre el conjunto de referencia el sistema
+recupera la línea de comandos completa empleada por el adversario, que coincide literalmente
+con la documentada en los metadatos del conjunto de datos.
+
+\subsection{Clasificación de las etiquetas ATT\&CK}
+
+Durante la explotación de los resultados se detectó que las etiquetas del repositorio de
+reglas no son homogéneas: bajo un mismo prefijo conviven identificadores de \textbf{técnicas},
+de \textbf{software}, de \textbf{grupos de actores} y nombres de \textbf{táctica}, incluyendo
+algunos no pertenecientes al estándar y acuñados por la propia comunidad. Una integración que
+asuma uniformidad clasifica erróneamente estas etiquetas, contaminando el mapeo ATT\&CK.
+
+El sistema las separa en categorías distintas validando los nombres de táctica contra la
+relación oficial, y conserva las no reconocidas en un campo aparte en lugar de descartarlas.
+
+\subsection{Resultados}
+
+\subsubsection{Conjunto de referencia}
+
+Sobre el conjunto atómico de robo de credenciales, el sistema produce \textbf{diez alertas y
+ningún falso positivo}, procedentes de cinco reglas independientes pertenecientes a tres
+categorías de origen distintas. Todas coinciden en señalar la técnica documentada en los
+metadatos del conjunto de datos, lo que confirma la corrección del mapeo.
+
+Resulta relevante que las cinco reglas detectan el mismo ataque por vías diferentes: unas por
+el acceso a la memoria del proceso de credenciales, otras por la línea de comandos empleada,
+otras por el fichero de volcado escrito a disco. Esta redundancia entre fuentes independientes
+constituye evidencia corroborada frente a un posible falso positivo.
+
+\subsubsection{Escenario multi-etapa}
+
+Sobre el escenario de emulación de campaña completa, el sistema procesa 195.197 eventos
+normalizados y produce \textbf{741 alertas} (0,38\,\% de los eventos), sin ningún rechazo. Las
+alertas implican \textbf{cuatro equipos} distintos y cubren \textbf{33 técnicas} de ATT\&CK,
+incluyendo robo de credenciales, persistencia, ejecución mediante servicios y exfiltración.
+
+La distribución temporal es reveladora: aproximadamente el 75\,\% de las alertas se concentra
+en el 20\,\% del intervalo analizado, lo que se corresponde con la ventana en que se ejecuta
+el grueso de la campaña.
+
+\subsubsection{Fatiga de alertas: evidencia empírica}
+
+El análisis de las alertas producidas ilustra con datos propios el problema que motiva este
+trabajo. Una única regla genera 292 alertas, el 39\,\% del total. Su inspección revela que
+todas proceden de \textbf{una sola acción del adversario}: el despliegue de un conjunto de
+herramientas administrativas mediante un intérprete de comandos, que generó una alerta por
+cada uno de los ficheros extraídos, en un intervalo de ocho minutos y sobre un único equipo.
+
+La detección es \textbf{correcta}: el comportamiento observado es efectivamente sospechoso. Lo
+inadecuado es la granularidad. Un analista no necesita 292 avisos, sino uno que informe de que
+se desplegó un conjunto de herramientas en un equipo determinado.
+
+Este caso concreto cuantifica el problema: una acción del adversario consume 292 unidades de
+atención del analista. Constituye asimismo el caso de uso más claro para la correlación
+descrita en la Sección siguiente.
+
+\subsubsection{Potencial de reducción de alertas}
+
+Como referencia previa a la implementación de la correlación multi-etapa, se estimó el efecto
+de una agrupación elemental por regla, equipo y ventana temporal de diez minutos. El resultado
+reduce las 741 alertas a \textbf{87 grupos}, un \textbf{88,3\,\%} de reducción, con un grupo
+máximo de 292 elementos.
+
+Esta cifra constituye el \textbf{suelo} contra el que debe medirse el Pilar~A: una heurística
+trivial ya alcanza ese nivel, por lo que la correlación basada en patrones debe superarlo
+agrupando además alertas de reglas distintas que constituyen una misma cadena de ataque.
+
+\subsubsection{Cobertura ATT\&CK}
+
+Se generó la matriz de cobertura en el formato del ATT\&CK Navigator \cite{navigator}, con dos
+capas: la cobertura \textit{potencial} —técnicas para las que existe al menos una regla
+cargada— y la \textit{observada} —técnicas efectivamente detectadas sobre los conjuntos de
+datos procesados.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|r|}
+\hline
+\textbf{Indicador} & \textbf{Valor} \\
+\hline
+Reglas cargadas & 2.301 \\
+Reglas sin etiqueta ATT\&CK & 238 (10,3\,\%) \\
+Técnicas con cobertura potencial & 300 \\
+\quad de las cuales subtécnicas & 177 \\
+Técnicas observadas en los datos & 34 \\
+Tasa de activación & 11,3\,\% \\
+\hline
+\end{tabular}
+\caption{Cobertura ATT\&CK del sistema.}
+\label{tab:cobertura-attack}
+\end{table}
+
+La baja tasa de activación no indica una limitación del sistema, sino de los conjuntos de
+datos empleados: existen 266 técnicas con detección disponible que ninguno de los escenarios
+procesados llega a ejercitar. Esta observación motiva la construcción de un entorno de
+emulación propio que permita activar dicha cobertura latente de forma dirigida.
+
+\subsubsection{Rendimiento}
+
+Sobre el escenario completo, el evaluador procesa 78 eventos por segundo frente a 2.093 reglas
+simultáneas, lo que equivale a aproximadamente 163.000 evaluaciones de regla por segundo. El
+consumidor está implementado sobre un grupo de Kafka sin asignación fija de particiones, de
+modo que el rendimiento es escalable mediante la ejecución de instancias adicionales.
+
+\section{Detección de anomalías}
+\label{sec:anomalias}
+
+Las reglas descritas en la sección anterior detectan comportamiento \textbf{documentado}. Para
+complementarlas se incorpora un detector de anomalías, cuyo cometido es señalar actividad
+inusual aunque no exista regla que la describa.
+
+\subsection{Papel dentro del sistema}
+
+Una decisión de diseño relevante es que la anomalía \textbf{no genera alerta por sí misma}.
+La razón es su elevada tasa de falsos positivos: emitir un aviso por cada desviación
+estadística agravaría precisamente el problema que el trabajo pretende resolver. Su salida se
+emplea en cambio para elevar la confianza de una secuencia ya detectada y para marcar
+actividad que merece revisión en ausencia de regla aplicable.
+
+\subsection{Nivel de agregación y características}
+
+El modelo opera sobre \textbf{ventanas de actividad por equipo} en lugar de sobre eventos
+individuales, por su mejor correspondencia con la naturaleza multi-etapa del problema: un
+ataque se manifiesta como un patrón de actividad, no como un evento aislado.
+
+Se definen 42 características, separadas deliberadamente en dos familias:
+
+\begin{itemize}
+    \item \textbf{Absolutas} (26): recuentos de eventos por clase, tipo de actividad y señal,
+    así como medidas de diversidad. Dependen del volumen de actividad de la ventana.
+    \item \textbf{Relativas} (16): proporciones de cada tipo de actividad sobre el total.
+    Son \textbf{independientes del volumen por construcción}.
+\end{itemize}
+
+Esta separación no es accesoria: permite determinar experimentalmente qué parte de la
+capacidad de detección procede del volumen de actividad y cuál del perfil de comportamiento.
+
+\subsection{Protocolo experimental}
+
+El entrenamiento emplea Isolation Forest \cite{isolationforest} sobre la implementación de
+scikit-learn \cite{scikitlearn}, y se comparan dos estrategias:
+
+\begin{enumerate}
+    \item \textbf{Entrenamiento con ventanas limpias}: únicamente aquellas sin indicios
+    objetivos de actividad maliciosa. Corresponde al planteamiento canónico de aprender el
+    comportamiento normal.
+    \item \textbf{Entrenamiento con contaminación}: todas las ventanas, declarando la
+    proporción esperada de anomalías.
+\end{enumerate}
+
+Se incorpora asimismo una variante \textbf{supervisada} mediante bosques aleatorios, con y sin
+compensación del desbalanceo por SMOTE \cite{smote}.
+
+El conjunto de evaluación se mantiene \textbf{estrictamente separado} del de entrenamiento: se
+reserva un escenario completo, para el que se dispone de las alertas de la capa de reglas como
+referencia externa. Todos los experimentos se registran en MLflow \cite{mlflow} con sus
+parámetros, métricas y semillas, garantizando su reproducibilidad.
+
+\subsection{Controles experimentales}
+
+Junto a los modelos se incorporan dos controles cuya función es delimitar el mérito real de
+los resultados:
+
+\begin{itemize}
+    \item \textbf{Control de volumen}: un modelo entrenado con una \textbf{única}
+    característica, el número de eventos de la ventana. Si alcanzase un rendimiento comparable
+    al del modelo completo, quedaría demostrado que la aportación del enfoque multivariante es
+    marginal.
+    \item \textbf{Ablación de características potencialmente circulares}: se excluyen aquellas
+    que participan en la definición de «ventana limpia», para descartar que el modelo
+    aproveche información derivada de su propio criterio de entrenamiento.
+\end{itemize}
+
+\subsection{Resultados}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Configuración} & \textbf{Caract.} & \textbf{AUC-ROC} & \textbf{AUC-PR} \\
+\hline
+No supervisado, limpias, todas & 42 & \textbf{0{,}995} & 0{,}996 \\
+No supervisado, limpias, sin circulares & 34 & 0{,}995 & 0{,}996 \\
+\textit{Control: solo volumen} & 1 & \textit{0{,}941} & \textit{0{,}920} \\
+Supervisado sin SMOTE, sin circulares & 34 & 0{,}923 & 0{,}882 \\
+Supervisado con SMOTE, solo ratios & 16 & 0{,}913 & 0{,}869 \\
+No supervisado, contaminado, todas & 42 & 0{,}913 & 0{,}919 \\
+No supervisado, limpias, solo ratios & 16 & 0{,}867 & 0{,}806 \\
+Supervisado con SMOTE, sin circulares & 34 & 0{,}864 & 0{,}829 \\
+Supervisado sin SMOTE, solo ratios & 16 & 0{,}854 & 0{,}798 \\
+No supervisado, contaminado, solo ratios & 16 & 0{,}533 & 0{,}646 \\
+\hline
+\end{tabular}
+\caption{Resultados del detector de anomalías sobre el escenario de evaluación.}
+\label{tab:anomalias}
+\end{table}
+
+De la Tabla~\ref{tab:anomalias} se desprenden cuatro observaciones:
+
+\begin{enumerate}
+    \item \textbf{No existe circularidad.} Excluir las características que participan en la
+    definición de ventana limpia no degrada el resultado.
+
+    \item \textbf{Volumen y perfil son fuentes de información complementarias.} El control
+    basado únicamente en el volumen alcanza 0,941, y el modelo que emplea exclusivamente
+    características relativas —independientes del volumen— alcanza 0,867. Ambas discriminan de
+    forma independiente, y su combinación (0,995) supera a cualquiera por separado, lo que
+    justifica el enfoque multivariante frente a una regla de umbral.
+
+    \item \textbf{La pureza del conjunto de entrenamiento resulta determinante.} Con idéntico
+    conjunto de características, entrenar con ventanas limpias produce 0,867 mientras que
+    hacerlo con datos contaminados produce 0,533, indistinguible del azar.
+
+    \item \textbf{El efecto de SMOTE depende de la dimensionalidad.} Mejora el resultado con
+    16 características (0,854 $\rightarrow$ 0,913) y lo degrada con 34 (0,923 $\rightarrow$
+    0,864), comportamiento coherente con la interpolación entre vecinos en espacios de
+    dimensión elevada.
+\end{enumerate}
+
+\subsection{Limitaciones}
+
+Los resultados deben interpretarse con dos cautelas explícitas.
+
+La primera es el \textbf{tamaño del conjunto de evaluación}: veintiocho ventanas, de las cuales
+quince positivas. Con esa magnitud, la incertidumbre asociada a las métricas es
+considerable y valores próximos a la unidad deben leerse como indicio de separabilidad
+sencilla antes que como evidencia de un modelo excelente.
+
+La segunda, más relevante, afecta a la \textbf{representatividad de los datos}. Las ventanas
+que contienen actividad maliciosa presentan una mediana de eventos ocho veces superior a las
+benignas, con solapamiento reducido. Esta separabilidad es en buena medida un artefacto de la
+naturaleza de los conjuntos de datos empleados: capturas de laboratorio en las que las
+técnicas se ejecutan de forma concentrada sin actividad de fondo sostenida. En un entorno
+real, la actividad legítima presenta volúmenes comparables y un adversario competente opera
+precisamente con discreción.
+
+Ambas limitaciones convergen en la misma necesidad: disponer de telemetría con actividad
+benigna prolongada y de volumen comparable al de la actividad maliciosa. Esta constatación
+motiva la construcción del entorno de emulación descrito más adelante.
 
 \section{Pilar A: detección de secuencias multi-etapa}
 % TODO (F3): modelado de los escenarios a partir de los planes de emulación; definición de los

@@ -207,6 +207,85 @@ lectura y anotación para incorporarla a una plataforma. En esta línea, TRAM
 ATT\&CK mediante un modelo de lenguaje del dominio afinado para la tarea, lo que permite
 cerrar el ciclo desde el informe publicado hasta el grafo consultable.
 
+\section{Aprendizaje automático aplicado a la detección}
+\label{sec:ml}
+
+Los enfoques descritos hasta ahora —reglas de detección, patrones temporales, razonamiento
+lógico— comparten una característica esencial: son \textbf{simbólicos}. Alguien codifica
+explícitamente el conocimiento, y el sistema aplica exactamente lo codificado. Esto aporta
+precisión y, sobre todo, explicabilidad: siempre es posible indicar qué condición se cumplió.
+
+Su límite es igualmente evidente: \textbf{solo detectan lo que alguien ha descrito}. Una
+técnica sin regla escrita pasa inadvertida, por llamativa que resulte su ejecución.
+
+\subsection{Detección de anomalías}
+
+La detección de anomalías invierte el planteamiento. En lugar de describir el comportamiento
+malicioso, se modela el comportamiento \textit{normal} y se señala lo que se desvía de él.
+La ventaja es que no requiere conocer la amenaza de antemano; el inconveniente es que
+«distinto» no equivale a «malicioso», por lo que la tasa de falsos positivos es
+estructuralmente alta.
+
+Entre los métodos no supervisados, \textbf{Isolation Forest} \cite{isolationforest} resulta
+particularmente adecuado para este dominio. A diferencia de las técnicas basadas en
+distancias o densidades, aísla las observaciones mediante particiones aleatorias del espacio
+de características, partiendo de la premisa de que las instancias anómalas requieren menos
+particiones para quedar aisladas. Ello le confiere complejidad lineal y buen comportamiento
+en espacios de dimensión elevada, además de permitir declarar explícitamente la proporción
+esperada de anomalías, lo que resulta útil cuando el conjunto de entrenamiento no está
+completamente libre de actividad maliciosa.
+
+\subsection{El problema del desbalanceo}
+
+La detección de intrusiones presenta un desbalanceo extremo por naturaleza: la actividad
+maliciosa constituye una fracción mínima del total. Un clasificador que prediga siempre
+«normal» alcanzaría una exactitud superior al 99\,\% siendo completamente inútil, lo que
+obliga a emplear métricas robustas frente al desbalanceo —precisión, exhaustividad, área
+bajo la curva precisión-exhaustividad— en lugar de la exactitud global.
+
+Entre las técnicas de compensación, \textbf{SMOTE} \cite{smote} genera muestras sintéticas
+de la clase minoritaria interpolando entre vecinos próximos, en lugar de replicar las
+existentes. Su eficacia depende de la dimensionalidad: en espacios de muchas
+características, la interpolación puede generar muestras poco representativas.
+
+\subsection{Aprendizaje sobre grafos}
+
+Cuando el objeto de análisis es un grafo, las técnicas de aprendizaje sobre grafos permiten
+obtener representaciones vectoriales de los nodos que capturan su posición estructural. Sobre
+esas representaciones puede plantearse la \textbf{predicción de enlaces}: estimar qué
+relaciones son plausibles aunque no estén declaradas explícitamente.
+
+Trasladado al grafo de ataque descrito en la Sección~\ref{sec:grafos}, esto permite sugerir
+rutas de progresión que las reglas de interacción no contemplan porque nadie las formuló.
+
+\subsection{La tensión entre generalización y explicabilidad}
+
+Los enfoques simbólico y estadístico presentan fortalezas complementarias y debilidades
+opuestas:
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+ & \textbf{Simbólico} & \textbf{Aprendizaje automático} \\
+\midrule
+Cobertura & Solo lo codificado & Generaliza a lo no visto \\
+Explicabilidad & Total y trazable & Limitada u opaca \\
+Falsos positivos & Controlables por diseño & Estructuralmente altos \\
+Mantenimiento & Requiere codificación manual & Reentrenamiento \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Esta complementariedad motiva los enfoques \textbf{neurosimbólicos}, que combinan ambos
+paradigmas. Aplicado al problema que ocupa a este trabajo, el planteamiento consiste en que
+el componente estadístico \textit{proponga} —hipótesis, relaciones plausibles, comportamiento
+inusual— y el componente simbólico \textit{verifique y justifique}. De este modo se amplía la
+cobertura sin renunciar a la capacidad de explicar las conclusiones, que es un requisito
+explícito de este trabajo.
+
+% TODO: completar con referencias específicas de IA neurosimbólica y de trabajos que la
+% apliquen a seguridad (revisión bibliográfica pendiente).
+
 \section{Conciencia cibersituacional}
 \label{sec:conciencia}
 
@@ -263,6 +342,9 @@ persiguen son tres:
     las vulnerabilidades, la evidencia efectivamente observada por la capa de detección.
     \item Un \textbf{modelo de priorización explicable} que descompone cada puntuación en
     factores interpretables y lo acompaña de una justificación legible.
+    \item Una \textbf{integración de componentes de aprendizaje automático} en los puntos
+    donde aportan capacidades que el enfoque simbólico no cubre, manteniendo la
+    explicabilidad mediante verificación simbólica de sus propuestas.
 \end{enumerate}
 
 % TODO: completar esta sección con la comparativa explícita frente a trabajos concretos
