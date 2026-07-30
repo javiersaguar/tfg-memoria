@@ -33,8 +33,8 @@
 | Orquestación | Dagster (no Airflow) | Orientado a assets, moderno |
 | API / servicios | FastAPI (no Flask) | Async, tipado |
 | Plataforma CTI | OpenCTI (STIX 2.1) + MISP + feeds | Grafo CTI nativo con conector ATT&CK |
-| Extracción de TTPs | TRAM / SecureBERT (inferencia; LoRA ligero opcional) | Modelos pequeños/preentrenados |
-| Uso de ML | Solo inferencia + fine-tuning ligero. NADA de entrenar modelos grandes | RTX 5070 Laptop (~8 GB): inferencia OK, entrenamiento pesado no |
+| Extracción de TTPs | TRAM / SecureBERT: línea base en inferencia **y fine-tuning propio** sobre corpus anotado (ML-2) | Es el componente con mejor encaje con la línea de la tutora; cabe en la RTX 5070 (~110M par.) |
+| Uso de ML | **REVISADA el 26-07-2026** (`ROADMAP.md` §2, rev. 2). Antes: "solo inferencia, nada de entrenar". Ahora: **el ML tiene entidad propia** en cuatro componentes (ML-1 anomalías, ML-2 extracción de TTPs, ML-3 grafo, ML-4 scoring), entrenando **modelos pequeños** en local. Sigue descartado entrenar un LLM desde cero | (i) El trabajo se presenta a un Grado en Ingeniería y **Sistemas de Datos**; (ii) acerca el proyecto a la línea de la tutora. Contención: **regla §2.5 del roadmap** — si en febrero el núcleo no está cerrado, se recorta por el orden ML-4 → ML-1 → ML-3 → ML-2 |
 | Infra | Contenedores Docker en 1 host (WSL2), no una VM por servicio | Evitar overhead; opcional VMs víctima/atacante para telemetría real |
 | Cómputo | Portátil propio para todo el desarrollo; nube solo para fase de despliegue | El portátil (64 GB/16c) es coste hundido y más potente que las VMs de gama media |
 | Despliegue K8s | minikube/kind local; si se quiere nube: Azure for Students / GitHub Student Pack | La prueba GCP de 300 $ ya está gastada y no se puede repetir |
@@ -50,22 +50,34 @@
 - **Autoría (REGLA ESTRICTA):** todos los commits son exclusivamente de Javier Saguar <javisaguarantona@gmail.com>. **Ningún agente de IA debe figurar como autor ni co-autor**: prohibido añadir `Co-Authored-By`, "Generated with", "Assisted by" o cualquier atribución similar en mensajes de commit, PRs o código. Ninguna IA debe ejecutar `git commit`/`git push` de forma autónoma; los comandos se proponen y los ejecuta Javier. Guardián técnico: hook `.githooks/commit-msg` (activar tras clonar con `git config core.hooksPath .githooks`).
 
 ## 4. Estado actual
-- **Fase:** **F2 COMPLETADA**. Detección con reglas + ML-1 evaluado y registrado.
-- **Hecho:** matriz de cobertura ATT&CK generada (formato Navigator): **300 técnicas cubiertas** por 2.301 reglas, de las cuales 34 observadas en los datasets → **tasa de activación 11,3 %**. MLflow desplegado (perfil `mlops`) con **10 experimentos** de ML-1 registrados y comparables: no supervisado (Isolation Forest), supervisado (Random Forest) y variantes con SMOTE.
-- **En curso:** cerrar sesión.
-- **Siguiente:** **Pilar A (F3)** — detección multi-etapa con CEP. Pendiente en paralelo: laboratorio de emulación para validación robusta.
+- **Fase:** **F2 CERRADA** (30-07-2026, con pendientes reubicados y anotados en el roadmap). **F3 (Pilar A, CEP) arrancando por F3.1.**
+- **Hecho:** matriz de cobertura ATT&CK (300 técnicas / 2.301 reglas, 34 observadas, 11,3 % activación). MLflow con 10 experimentos de ML-1 (Isolation Forest, Random Forest, variantes SMOTE); control de volumen (AUC 0,941) fijado como línea base permanente para F7. Laboratorio de emulación operativo en VirtualBox y **dataset final generado**: 14.895 eventos (14.765 benignos / 130 maliciosos), 4 técnicas, tres fuentes de contaminación identificadas y filtradas.
+- **Pendientes reubicados al cerrar F2:** validación cruzada evaluador-vs-SQL → F7 · autoencoder y modelo secuencial → F3.3/F7 (🟢) · publicación en `det.anomalies` → F3.3 · integración del dataset del laboratorio en ML-1 (requiere ruta CSV → OCSF, hoy inexistente).
+- **Deuda de reproducibilidad:** los scripts de `emulation/` en el repo son la versión **previa** a las tres correcciones de contaminación, y `run-lab.ps1` solo existe dentro de la VM (`C:\Lab`). Pendiente copiarlos a `\\VBOXSVR\Shared` → `emulation/`.
+- **Siguiente:** F3.1 — inventario de materia prima en `tfg.alerts` (¿están detectadas las 7 variantes de LSASS_campaign?), verdad conocida de apt29 a partir de `apt29.xlsx`, y diseño de P1 sobre el esquema de alerta **real**.
 
 
 ## 5. Estructura del repo
+> **Nota (24-07-2026):** la documentación se separó a un segundo repositorio. Este archivo y la
+> memoria LaTeX viven en `tfg-memoria`; el código, en `tfg-ciberconciencia`. `./scripts/save.sh`
+> guarda y sube ambos.
+
 ```
-tfg-ciberconciencia/
+tfg-memoria/
 ├── BITACORA.md          # este archivo (memoria del proyecto)
-├── AGENTS.md            # copia/enlace de esta bitácora para agentes que la auto-cargan (o CLAUDE.md)
+├── AnotacionesMemoria.md
+└── Memoria/             # proyecto LaTeX
+
+tfg-ciberconciencia/
+├── AGENTS.md            # contexto para agentes que lo auto-cargan (o CLAUDE.md)
 ├── README.md
 ├── .gitignore
-├── docs/                # anteproyecto, planning, estudios, memoria
+├── docs/                # ROADMAP.md, anteproyecto, planning, estudios, escenarios
 ├── infra/               # docker-compose, perfiles, k8s/minikube
 ├── pipeline/            # ingesta, jobs Flink/CEP, normalización OCSF
+├── detection/           # reglas Sigma: pipeline propia, loader, evaluador, cobertura ATT&CK
+├── ml/                  # ML-1 anomalías (features, entrenamiento, MLflow)
+├── scripts/             # up/down, save.sh (guarda en los dos repos)
 ├── cti/                 # extracción TRAM/NER, conectores OpenCTI, STIX
 ├── graph/               # esquema Neo4j, cypher, reglas Datalog/MulVAL, GDS
 ├── scoring/             # priorización explicable
@@ -308,3 +320,67 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Problemas / pendiente:** en el conjunto supervisado la clase "ataque" es **mayoritaria** (260 vs 132), al contrario que en un escenario real; SMOTE sobremuestrea la clase equivocada respecto a producción. Limitación propia de los datasets de laboratorio, a documentar.
 - **Siguiente paso:** F3, Pilar A (CEP).
 - **Archivos tocados:** `detection/coverage_matrix.py`, `ml/anomaly/train_mlflow.py` (nuevos), `detection/loader.py`, `infra/docker-compose.yml`, `BITACORA.md`.
+
+
+### 2026-07-30 — Migración a VirtualBox y primera captura del laboratorio de emulación
+- **Con qué/quién:** Claude (chat), paso a paso.
+- **Objetivo:** completar la migración del laboratorio de Hyper-V a VirtualBox (decidida el día anterior por problemas de portapapeles/transferencia de ficheros) y generar el primer dataset etiquetado de telemetría benigna/maliciosa con Atomic Red Team.
+- **Hecho:**
+  - VM nueva en VirtualBox (Windows 11 Pro, EFI) con Guest Additions, portapapeles bidireccional y carpeta compartida `\\VBOXSVR\Shared` — resuelve de raíz la fricción de ayer.
+  - Reinstalados Sysmon (config SwiftOnSecurity) y Atomic Red Team (`Invoke-AtomicRedTeam` 2.1.0); corregida la persistencia de la política de ejecución (`Set-ExecutionPolicy Bypass -Scope LocalMachine`, que ayer solo se aplicaba a la sesión).
+  - Rediseñado el mecanismo de captura: `capture-manifest.ps1` (ejecuta atómico + registra ventana temporal en `manifest.csv`, sin *pattern-matching* de texto en vivo) + `export-events-clean.ps1` (Sysmon 1/3/7/8/10/11/12/13/22 + Security 4688 + PowerShell 4104) + `label_dataset.py` (etiquetado offline por *join* de ventana, tolerancia 1 s).
+  - Primera tanda capturada: **T1547.001** (19/20 subtests, excluido el 9 "SystemBC"), **T1070** (2/2), **T1055** (3 intentados: 3/5/6, los tres bloqueados por Windows Defender al detectar los binarios de inyección), **T1003.001** (comsvcs.dll completado sin restricción; ProcDump ×2 con acceso a LSASS denegado — mismo bloqueo de protección de LSA que Mimikatz el día anterior).
+  - Corregida la auditoría avanzada de creación de procesos: `auditpol` en español necesita el nombre en español o el GUID (`{0CCE922B-...}`), más `SCENoApplyLegacyAuditPolicy=1` para que la directiva avanzada no quede anulada por la heredada.
+  - **Diagnosticadas y corregidas dos fuentes de contaminación** en el primer dataset etiquetado (4.855 eventos): (1) `EventID 4103` (PowerShell Module Logging con comodín `"*"`) resultó ser ~59 % de todo el dataset y casi puro ruido interno (`Set-StrictMode` del propio framework), contaminando ambas clases por igual — corregido desactivando `ModuleLogging` y retirando 4103 del export, quedándose solo con 4104 (script block logging, el que sí captura contenido real). (2) `whoami.exe`/`HOSTNAME.EXE` (llamadas de contexto internas de `Invoke-AtomicTest`) suponían el 62 % de las muestras "maliciosas" a nivel de proceso — corregido con filtro explícito en `label_dataset.py`. Verificado con datos reales: tras ambos filtros, las muestras maliciosas pasan de 1.052 (contaminadas, una sola ventana dominando el 78 %) a 147 (limpias y bien repartidas entre técnicas).
+  - Incidente: la VM se congeló tras ~90 min desatendida (pantalla en negro sin respuesta, requirió `Reset`). Causa probable: suspensión de pantalla/equipo de Windows. `manifest.csv` y el dataset previo sobrevivieron intactos; solo se perdió `telemetry_clean.json` (regenerado sin problema) y el generador benigno en curso.
+  - Construido `run-lab.ps1`: orquesta benigno → export → etiquetado → resumen → copia de seguridad con sello temporal en la carpeta compartida, con comprobaciones previas (admin, ficheros, Sysmon, Python/pandas) y corrección de raíz del cuelgue (desactiva suspensión de pantalla/equipo e hibernación; amplía el tamaño máximo de los logs de eventos para no perder las ventanas de esta mañana durante una sesión larga).
+- **Decisiones:** confirmado el mecanismo de captura por ventana + etiquetado offline como método definitivo (frente al *pattern-matching* en vivo del primer intento en Hyper-V). Se mantiene el descarte de herramientas de malware real (Mimikatz, SystemBC, NanoDump) pese al aislamiento del laboratorio; los bloqueos de Defender/protección de LSA se tratan como resultado documentable ("técnica intentada, prevenida por control"), no como fallos a forzar.
+- **Problemas / pendiente:** dataset final (con línea base benigna sostenida de 2h) generándose vía `run-lab.ps1 -BenignMinutes 120` al cierre de esta sesión — pendiente de revisar el resumen. T1055 se queda sin ninguna muestra "exitosa" (las 3 intentadas fueron bloqueadas); valorar en el futuro variantes que no disparen AV. Pendiente ampliar cobertura de T1003.001 con una variante que documente el bloqueo de LSA sin depender de herramientas de volcado reales. Falta capturar el **EventID 1116 de Defender** si se quiere una señal explícita de "técnica prevenida por control".
+- **Siguiente paso:** revisar el dataset final del laboratorio (`dataset_etiquetado.csv`); decidir cómo integrarlo en la evaluación de ML-1 (aporta volumen benigno sostenido, relevante para el hallazgo de "volumen como artefacto" del 27-07); arrancar F3 — diseño de patrones CEP (P1-P5).
+- **Archivos tocados:** `C:\Lab\{capture-manifest.ps1, export-events-clean.ps1, label_dataset.py, run-lab.ps1, manifest.csv, telemetry_clean.json, dataset_etiquetado.csv}`, VM VirtualBox nueva (config + Guest Additions + carpeta compartida), registro de Windows (auditoría, ModuleLogging, energía).
+
+- **Cierre del dataset (30-07, tarde):** ejecutado `run-lab.ps1 -BenignMinutes 180` sin errores (comprobaciones previas, energía, logs ampliados, todo en verde). Dataset final: 14.895 eventos (14.765 benigno / 130 malicioso), 4 técnicas (T1547.001=86, T1003.001=26, T1055=10, T1070=8). Detectada y corregida una tercera fuente de contaminación tras revisión del fichero real: `svchost.exe` escribiendo telemetría de compatibilidad de aplicaciones (`InventoryApplicationFile`) durante las ventanas de ataque — 16 filas, ya filtradas en `label_dataset.py`. Verificada diversidad real: T1547.001 con 19 subtests distintos y 48 líneas de comando distintas. Documentado como limitación conocida: pico de 5.528 eventos benignos en la ventana 10:30-11:00 por instalación real de Windows Update en segundo plano — ruido de sistema legítimo, no atribuible al generador de actividad simulada, relevante para el análisis de "volumen como artefacto" ya identificado en ML-1.### 2026-07-30 (2) — Armonización de plan y memoria + arranque de F3.1
+- **Con qué/quién:** Claude Code.
+- **Objetivo:** dejar `ROADMAP.md` y `BITACORA.md` fieles al estado real antes de empezar F3, y fijar el punto de partida del Pilar A.
+- **Hecho:**
+  - **Roadmap (rev. 3).** Marcado F2 como cerrada con sus resultados reales; §1 actualizado (cobertura 99,4 % sobre apt29 day1 junto al 100 % del dataset de referencia); eliminada F2 de la tabla "lo que falta"; F2.1/F2.2/F2.3 con los `[x]` que correspondían.
+  - **Pendientes de F2 reubicados explícitamente** en lugar de darlos por hechos: validación cruzada evaluador-vs-SQL → F7; autoencoder y modelo secuencial de ML-1 → F3.3/F7 (🟢); publicación en `det.anomalies` → F3.3, que es donde se consume; integración del dataset del laboratorio en ML-1 (necesita una ruta CSV → OCSF que hoy no existe).
+  - **Corregido el esquema de alerta del roadmap**, que llevaba desde F2.1 sin actualizarse y no coincide con lo que emite `build_alert()`. Diferencias que importan para el CEP: `attack.technique_ids[]` y `attack.tactic_ids[]` son **arrays**, no escalares; las tácticas van con **nombre** (`execution`, `defense-evasion`) y **no** con identificador `TAxxxx`; el usuario es `actor.user_name` (plano), no `actor.user.name`; `time` es epoch en milisegundos. Un patrón `MATCH_RECOGNIZE` escrito contra el esquema antiguo habría casado cero filas sin dar error.
+  - **Bitácora §2:** actualizada la fila "Uso de ML", que seguía diciendo "solo inferencia, nada de entrenar" y contradecía la revisión del 26-07 del roadmap (ML con entidad propia en cuatro componentes, modelos pequeños entrenados en local). Anotada la regla de contención §2.5 como salvaguarda.
+  - **Bitácora:** fusionada la entrada duplicada del 30-07 (dos versiones del mismo día sobre la migración a VirtualBox), preservando el detalle único de la corta (EventID 1116 de Defender como señal explícita de "técnica prevenida"). Actualizados §4 (estado) y §5 (estructura de repos, que seguía describiendo la bitácora dentro del repo de código pese a la separación del 24-07).
+  - **Detectada deuda de reproducibilidad del laboratorio:** los scripts versionados en `emulation/` son la versión **previa** a las tres correcciones de contaminación (`export-events-clean.ps1` sigue exportando el 4103; `label_dataset.py` no lleva los filtros de `whoami.exe`/`HOSTNAME.EXE` ni de `InventoryApplicationFile`), y `run-lab.ps1` solo existe dentro de la VM (`C:\Lab`). El dataset final de 14.895 eventos **no es reproducible desde el repo** hasta que se copien.
+  - **Inventario del material de F3.1:** los logs de Zeek ya vienen dados en el dataset OTRF (`day1/zeek/combined_zeek.log` y por host, ídem day2) — no hace falta procesar pcaps ni ejecutar Zeek; day2 sigue sin extraer (43 MB comprimidos); el plan de emulación es un único `apt29.xlsx`, no YAML, así que la verdad conocida hay que parsearla.
+- **Decisiones:**
+  1. **F2 se cierra con pendientes nombrados y reubicados**, no silenciados. Un pendiente movido de fase y anotado es plan; un pendiente olvidado es deuda.
+  2. **Los `WITHIN` de los patrones CEP se derivan de la verdad conocida de apt29**, no se fijan a ojo. Es lo que convierte `docs/scenarios/apt29-day1.md` en prerrequisito de F3.2 y no en documentación decorativa.
+  3. **Fuente de las etapas del CEP: decisión abierta, se cierra con datos.** Correlacionar solo sobre `det.alerts` es más semántico, pero deja etapas ciegas (si ninguna regla Sigma etiqueta la escritura del `.dmp` o la conexión saliente, esa etapa no existe como alerta y el patrón nunca completa). Propuesta a validar: híbrido, alertas Sigma como etapas ancla + flujo derivado de `norm.events` filtrado por las señales `tfg.signal_*` ya precalculadas en los mapeadores para las etapas de refuerzo. Se decide tras el inventario, no antes.
+  4. **Paso 0 de F3.1: inventario de materia prima.** Antes de escribir un solo `MATCH_RECOGNIZE`, comprobar qué `dataset_id` hay realmente en `tfg.alerts`, cuántas alertas por técnica ancla y qué claves trae de verdad `matched_fields`. En particular, si las 7 variantes de LSASS_campaign están normalizadas y detectadas: sin sus alertas, el DoD 2 de F3 (P1 generaliza a las 7) no se puede ni medir.
+- **Problemas / pendiente:** la deuda de reproducibilidad del laboratorio requiere arrancar la VM para copiar `run-lab.ps1`, `export-events-clean.ps1` y `label_dataset.py` a `\\VBOXSVR\Shared` y de ahí a `emulation/`. No se puede resolver desde WSL.
+- **Siguiente paso:** F3.1 — levantar servicios, inventario sobre `tfg.alerts`, y con eso decidir si P1 se ancla solo en alertas o en el híbrido con señales.
+- **Archivos tocados:** `docs/ROADMAP.md` (rev. 3), `BITACORA.md` (§2, §4, §5 y diario).
+### 2026-07-30 (3) — F3.1: corpus reproducible, verdad conocida de apt29 y ancla de P1
+- **Con qué/quién:** Claude Code.
+- **Objetivo:** arrancar el Pilar A: dejar el pipeline en un estado reproducible, reconstruir la cadena real de apt29 day1 y decidir con datos el diseño de P1.
+- **Hecho:**
+  - **Inventario de partida.** Solo había dos datasets detectados (apt29 day1 y el atómico de comsvcs): las 7 variantes de LSASS_campaign, que son la prueba de generalización del DoD 2 de F3, no estaban cargadas. Confirmado además que las 771 alertas que figuraban eran 741 + 30, sin duplicados.
+  - **Diagnosticado un fallo de fondo del pipeline.** Los grupos de consumo solo tenían offset comprometido en **una partición** de cada topic (`normalizer-v1` en la 0 de `raw.host.windows`, `detector-v1` en la 3 de `norm.events`). Como los jobs arrancan sin `--from-beginning`, el `auto.offset.reset=latest` coloca al consumidor al final de las particiones sin offset, que por tanto nunca se leen ni se commitean: quedan enganchadas para siempre. Consecuencia: `norm.events` había acumulado 2,7 M mensajes de pasadas superpuestas y parte de los datos no se había procesado nunca.
+  - **`scripts/load_f3_corpus.sh`** (nuevo): recrea los cinco topics con el contrato de particiones del roadmap, reproduce un corpus **fijo** (apt29 day1 + atómico comsvcs + las 7 campañas LSASS = 550.494 eventos) y lo procesa con grupos de consumo nuevos. Deja el estado de partida de la fase documentado y repetible con un comando.
+  - **Corpus cargado y verificado:** 550.494 eventos, cobertura de normalización 96,4 %, 1.199 alertas sobre 9 datasets.
+  - **DLQ analizado:** de los 20.093 rechazos, ~60 % son PowerShell 4105/4106 (marcadores de inicio/fin de script block, sin contenido). **Ni un solo Sysmon 10 ni 11 en el DLQ**, así que el acceso a LSASS y la escritura del volcado se normalizan bien. Identificados 4 tipos que sí conviene mapear por su relación con F3: Sysmon 22 (DNS, C2 para P2), Sysmon 17 (PipeCreated — apt29 usa Cobalt Strike, que se apoya en named pipes; llamativo que el 18 sí esté mapeado), Sysmon 26 (FileDeleteDetected, etapa D de P1) y Security 5379.
+  - **`docs/scenarios/apt29-day1.md`** (nuevo): la verdad conocida de la secuencia, extraída de `apt29.xlsx` (28 pasos en 10 etapas, con host y usuario), traducida a ATT&CK actual, con el mapeo a los patrones P1-P4 y las ventanas temporales medidas sobre las alertas reales.
+- **Decisiones y hallazgos:**
+  1. **El ancla de P1 no puede ser `T1003.001`.** Medido sobre las 7 variantes: `T1003.001` exacto cubre **6 de 7**; la familia `T1003.*` y la táctica `credential-access` cubren **7 de 7**. La que falla es `LSASS_campaign_01`, **Mimikatz `logonpasswords`**, la variante más emblemática: ninguna regla la etiqueta como T1003.001 porque Meterpreter ejecuta Mimikatz dentro de su propio proceso y no hay un proceso externo abriendo un manejador contra `lsass.exe`. **Es el riesgo R6 del roadmap materializado y medido**, y justifica anclar en la familia y no en la subtécnica.
+  2. **El precursor de P1 no puede excluirse por técnica.** En apt29 el mejor precursor es el *drop* de la herramienta de volcado (`Cred Dump Tools Dropped Files`, nivel high), que viene etiquetado con `T1003.001-005`. La condición natural `A.technique <> 'T1003.001'` eliminaría justo la mejor evidencia. La separación entre etapas debe hacerse por clase de evento de origen o por las claves de `matched_fields`.
+  3. **`WITHIN` de P1 = 10 minutos**, el doble del núcleo observado (volcado de herramienta → acceso a LSASS = 4 min 47 s). Documentada la limitación: la campaña entera dura 26 min, así que cualquier ventana de 20-30 min abarcaría el día completo y el criterio temporal dejaría de discriminar. Es un artefacto de las evaluaciones de MITRE (ejercicios comprimidos frente a permanencias reales de semanas): las ventanas valen para reproducir estos resultados, no como valores operativos, y en F7 hay que medir la sensibilidad a ese parámetro.
+  4. **P1 se implementa solo sobre `det.alerts`**, decisión tomada con datos: las etapas de ancla y de volcado a disco ya existen como alertas Sigma en los dos datasets. El híbrido con las señales `tfg.signal_*` queda reservado para P2 (conexión saliente) y P4.
+  5. **`matched_fields` usa rutas OCSF, no nombres de campo Sigma.** Las claves reales útiles son `file.path`, `unmapped.GrantedAccess` (0x1fffff), `unmapped.CallTrace` (comsvcs.dll) y `process.cmd_line`.
+  6. **La clave de partición por `hostname` anula el paralelismo del detector** con estos datasets: una sola partición concentró el 66 % de los eventos porque las 7 campañas comparten host. Es un compromiso real —el orden por máquina es obligatorio para el CEP— y tiene su sitio en el apartado de rendimiento de F7. En un entorno con cientos de hosts el reparto sería uniforme; en laboratorio, no.
+  7. **Los identificadores del plan de emulación son de ATT&CK v5-v6 y varios están obsoletos** (`T1086`→`T1059.001`, `T1060`→`T1547.001`, `T1050`→`T1543.003`, `T1107`→`T1070.004`, `T1088`→`T1548.002`, `T1002`/`T1022`→`T1560`). Sin traducirlos, el cruce plan ↔ alertas no cuadra y parecen fallos de detección que no lo son.
+  8. **El orden real de apt29 no coincide con el P3 del roadmap**: es escalada (3.B) → descubrimiento (4.x) → persistencia (5.x), no descubrimiento → privilegios → persistencia. El patrón tendrá que admitir ambos órdenes o ceñirse al observado y justificarlo.
+- **Problemas / pendiente:**
+  - **Duplicados en `tfg.alerts`:** apt29 da 752 filas en vez de 741, con 140 repetidas (grupos de hasta 5 copias). Causa: la detección en 3 instancias paralelas commitea cada 5.000 eventos, y al salir las instancias que agotaron sus particiones por `--idle-exit`, la superviviente reanudó desde el último commit y reprocesó. **Invalida cualquier cifra que vaya a la memoria, incluida la métrica estrella de reducción de alertas.** Solución acordada, ya pendiente desde el 27-07: pasar `tfg.alerts` a `ReplacingMergeTree` con clave de deduplicación —arregla el problema de raíz en vez de prohibir el paralelismo—. **Es lo primero de la próxima sesión.**
+  - Efecto secundario del `--idle-exit` en instancias paralelas: las rápidas se suicidan en lugar de esperar un rebalanceo que les dé trabajo. Subirlo o quitarlo en ese modo.
+  - `T1685.001` vuelve a aparecer en las alertas; sigue pendiente verificarlo en attack.mitre.org (anotado ya el 27-07).
+  - apt29 **day2** sigue sin cargar (1,7 GB ya extraídos en `data/samples/apt29/`, 4,4× day1). Se añade de forma deliberada cuando P1 esté escrito.
+- **Siguiente paso:** `ReplacingMergeTree` y re-volcado (las 1.199 alertas siguen en el topic, no hay que re-detectar); después, escribir P1 en `MATCH_RECOGNIZE` con ancla `T1003.*`, `WITHIN` de 10 min y las claves OCSF reales de `matched_fields`.
+- **Archivos tocados:** `scripts/load_f3_corpus.sh` (nuevo), `docs/scenarios/apt29-day1.md` (nuevo), `docs/ROADMAP.md`.
