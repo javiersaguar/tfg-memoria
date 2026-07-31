@@ -417,6 +417,39 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - Sigue pendiente lo de sesiones anteriores: versionar los scripts corregidos del laboratorio (requiere arrancar la VM), verificar `T1685` en attack.mitre.org, cargar apt29 day2.
 - **Siguiente paso:** sesión B — P1 en `MATCH_RECOGNIZE` sobre Flink, contrastando contra `tfg.p1_campanas` como oráculo.
 - **Archivos tocados:** `pipeline/jobs/detect_job.py`, `pipeline/jobs/sink_alerts.py`, `infra/clickhouse/init/02_alerts.sql`, `detection/patterns/p1_credential_theft.sql` (nuevo), `detection/patterns/p1_metrics.sql` (nuevo).
+### 2026-07-31 (2) — F3.2: P1 en MATCH_RECOGNIZE y correlación en dos niveles
+- **Con qué/quién:** Claude Code.
+- **Objetivo:** llevar P1 a streaming sobre Flink, contrastándolo contra el oráculo en batch, y cerrar el circuito hasta `det.campaigns`.
+- **Hecho:**
+  - **Tabla Flink sobre `det.alerts`** con el esquema real: `time` como `BIGINT` epoch ms y columna derivada `TO_TIMESTAMP_LTZ`, técnicas y tácticas como `ARRAY<STRING>`, `actor` plano, `matched_fields` como `MAP`. Parsea correctamente a la primera.
+  - **Truco de validación que ahorra la mayor parte del dolor:** `'scan.bounded.mode' = 'latest-offset'` junto con `execution.runtime-mode = batch` convierte la fuente Kafka en acotada. Elimina de raíz el problema clásico del CEP sobre datos históricos —el watermark no avanza lo suficiente para cerrar la última ventana y no se emite nada— y además da salida final en lugar de *changelog* con `+U`/`-U`, que es ilegible para iterar.
+  - **P1 implementado en dos niveles** (`infra/flink/jobs/p1_04_dos_niveles.sql`) y **emisión a `det.campaigns`** (`p1_05_emision.sql`): 10 campañas publicadas, con clave de partición `hostname` como el resto del contrato de topics. Circuito cerrado `norm.events → det.alerts → det.campaigns`.
+- **Resultados frente al oráculo (vista `tfg.p1_campanas`):**
+  | | Oráculo (batch) | Flink (streaming) |
+  |---|---|---|
+  | Campañas totales | 10 | 10 |
+  | LSASS_campaign_01..07 | 7, una por variante | **7, una por variante** |
+  | apt29 SCRANTON | 2 | 2 |
+  | apt29 NASHUA | 1 | 0 |
+  | Atómico WORKSTATION5 | 0 | 1 |
+  - **El DoD 2 se mantiene en streaming: 7 de 7 variantes.**
+  - La confianza descompuesta reproduce el oráculo exactamente en los casos comprobados (campaign_01 = 0,50; campaign_04 = 0,85; campaign_05 = 0,75).
+  - Las dos divergencias están explicadas y son decisiones de diseño, no fallos: **NASHUA se pierde** porque tiene una sola alerta de credenciales (el acceso remoto por WinRM) y sus dos alertas de limpieza llegan después, mientras el patrón `(E C)` exige que la segunda fila sea la de credenciales — la transición está definida en un solo sentido; **el atómico aparece de más** porque el oráculo lo excluye con un `HAVING` que exige contexto más allá de las anclas y la versión Flink no impone ese requisito.
+- **Hallazgo principal — por qué la correlación tiene que ser en dos niveles:**
+  Flink **no admite cuantificadores voraces como último elemento de un `PATTERN`** ("Greedy quantifiers are not allowed as the last element of a Pattern yet"), y el cuantificador reluctante que sí admite produce la coincidencia **mínima**. Es decir: `MATCH_RECOGNIZE` **no puede expresar "agrupa todas las evidencias consecutivas hasta que se abra un hueco"**. Comprobado empíricamente: con `PATTERN (E+? C)` salen 29 coincidencias de dos filas donde el oráculo ve 10 campañas. La solución es la correlación jerárquica que el roadmap ya contemplaba para el salto multi-host, pero que aquí **deja de ser una opción de diseño y pasa a ser un requisito impuesto por la herramienta**: nivel 1 (`MATCH_RECOGNIZE`) reconoce la *transición* evidencia → acceso a credenciales, que es lo que un CEP hace bien; nivel 2 (agregación por hueco) agrupa transiciones en campañas, que es lo que un CEP hace mal y una agregación hace trivialmente. Es un argumento de peso para la memoria: acota qué se puede pedirle a un motor CEP declarativo y qué no.
+- **Otras limitaciones de Flink encontradas y documentadas en los propios ficheros SQL:**
+  1. `DEFINE` no admite subconsultas correlacionadas (`no SELECT scope`), así que la lógica sobre arrays hay que **precalcularla en la proyección**. Mejor diseño de todas formas, y coherente con las señales precalculadas del normalizador.
+  2. `COUNT(DISTINCT ...)` no está permitido en `MEASURES`.
+  3. `LAG` no acepta `TIMESTAMP_WITH_LOCAL_TIME_ZONE`; hay que arrastrar el epoch en milisegundos.
+  4. `WITHIN` **no se usa**: acota la duración *total* del match, no el hueco entre elementos. El criterio del oráculo —hueco ≤ 10 min entre evidencias consecutivas— se expresa en el `DEFINE` con `LAST(E.ts, 1)`, con desplazamiento 1 porque `LAST(E.ts)` incluiría la propia fila candidata y el hueco sería siempre 0.
+- **Problemas / pendiente:**
+  - **Los contadores de etapa de la versión Flink no son comparables uno a uno con los del oráculo.** Con `AFTER MATCH SKIP TO NEXT ROW` las transiciones se solapan y una misma alerta participa en dos, así que se contaría dos veces. Como `COUNT(DISTINCT)` está prohibido en `MEASURES`, se han **renombrado** a `trans_*`: no son alertas con esa etapa, son transiciones que la tocan. El recuento exacto por alerta exige cruzar aguas abajo contra la evidencia usando el intervalo de la campaña.
+  - `stages[]` del esquema de campaña del roadmap **no se emite todavía**: recoger los `alert_id` de cada etapa exige `ALL ROWS PER MATCH` más deduplicación por el solapamiento.
+  - Reconciliar las dos divergencias con el oráculo (transición bidireccional para recuperar NASHUA; decidir si se exige contexto como hace el `HAVING`).
+  - Sigue pendiente de sesiones anteriores: `EventRecordID` en el normalizador, versionar los scripts del laboratorio, verificar `T1685`, cargar apt29 day2.
+- **Siguiente paso:** reconciliar las divergencias y emitir `stages[]`; después, P2 (movimiento lateral), que reutiliza la máquina de dos niveles para el salto entre hosts.
+- **Archivos tocados:** `infra/flink/jobs/{p1_00_tabla,p1_01_batch,p1_02_patron,p1_03_match,p1_04_dos_niveles,p1_05_emision}.sql` (nuevos), `docs/ROADMAP.md`.
+
 ### 2026-07-31 (3) — Revisión de lo hecho y reconciliación batch ↔ streaming
 - **Con qué/quién:** Claude Code, paso a paso con los comandos ejecutados por Javier.
 - **Objetivo:** revisar que lo producido en las sesiones A y B es correcto, y cerrar las dos divergencias entre la versión en batch y la de Flink.
