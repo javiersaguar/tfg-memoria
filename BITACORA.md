@@ -592,3 +592,40 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - El patrón común en ambos: **la guarda correcta ya estaba escrita en otro fichero y no se trasladó**. Revisar el fichero hermano antes de escribir uno nuevo cuesta menos que encontrar el fallo después.
 - **Problemas / pendiente:** la **detección sigue sin rehacerse**, así que `tfg.alerts` está vacía y los paneles de alertas y campañas no tienen datos. Antes de relanzarla hay que **corregir la clave de particionado de `norm.events`**: `normalize_job.py:96` particiona por `device_hostname` y con tan pocos hosts distintos el 66 % de los mensajes cae en una sola partición (350.118 de 530.401), de modo que el paralelismo no sirve de nada. Particionar por `dataset_id|hostname` preserva el orden que importa —el de (captura, host), que es la unidad con la que correlacionan P1 y P2— y reparte bien. Solo después tendrá sentido verificar el **741**.
 - **Archivos tocados:** `pipeline/replay_dataset.py`, `pipeline/jobs/normalize_job.py`, `pipeline/normalize/registry.py`, `pipeline/normalize/ocsf_common.py`, `infra/clickhouse/views/v_red_lateral.sql`, `infra/grafana/dashboards/04-lateral-movement.json`.
+
+### 2026-09-14 — El 741, por fin: particionado por identidad y detección que escala
+- **Con qué/quién:** Claude Code, sesión muy guiada, con los comandos ejecutados por Javier.
+- **Objetivo:** cerrar lo que quedó a medias el 11-09 —la detección no llegó a terminar— y verificar por fin el **741**, el criterio de identidad pendiente desde el 08-09.
+- **Hecho:**
+  - **Medir antes de cambiar.** La carga del 11-09 no terminó porque `norm.events` se particionaba por `device_hostname` y el 66 % de los mensajes caía en una sola partición. Se midió el reparto real por clave y se descubrió que el problema no era solo tener pocos hosts: **las dos claves más grandes del corpus colisionaron en la misma partición**. `MKT01.pandalab.com` —que suma cuatro campañas LSASS, 219.829 eventos— y `SCRANTON.dmevals.local` —130.289— cayeron juntas en la partición 1, y sumaban exactamente sus 350.118 mensajes. Las otras cinco particiones cuadraban también al evento con sus claves.
+  - **Modelo del particionador, validado antes de usarlo.** Se reprodujo el reparto real con `CRC32 % 6`, primero en Python y luego en ClickHouse, y ambos dieron las seis particiones observadas **sin un solo evento de diferencia**. Con eso las predicciones sobre claves alternativas pasan a ser fiables y no aproximaciones.
+  - **La clave propuesta inicialmente no bastaba, y simularla lo evitó.** `dataset_id|hostname` parte MKT01 en cuatro, pero SCRANTON volvía a chocar con PRD01 y NEWYORK: 193.073 mensajes (36,4 %) en una partición, **otra completamente vacía**, ~34 min de detección. Probar formatos de clave hasta que el hash cayera bien habría sido ajustar el particionador a este corpus concreto: sobreajuste, y no se defiende.
+  - **La pregunta que había que haberse hecho el primer día: ¿quién necesita ese orden?** Se revisaron los consumidores de `norm.events`. `detect_job` evalúa reglas Sigma evento a evento **sin estado**; `sink_clickhouse` inserta en una tabla que deduplica. **Flink no lee este topic**: los seis jobs de P1 leen `det.alerts`, cuya clave construye `detect_job` por su cuenta a partir del host, y además Flink impone su propio orden (`PARTITION BY dataset, host` + `ORDER BY ts` con marca de agua). **Particionar por host protegía una garantía que no usaba nadie**, y a cambio impedía paralelizar.
+  - **Nueva clave: la identidad del evento** (`dataset_id|host|canal|record_number`, en `clave_particion()`). Es determinista —el mismo evento cae siempre en la misma partición—, uniforme **por cardinalidad y no por suerte** (~530.000 valores distintos en vez de 12), y es la misma identidad que la clave de ordenación de `tfg.events`. Simulada: entre 87.948 y 88.629 mensajes por partición, todas en el 16,6-16,7 %. Verificado además que la cadena que construye el código coincide **byte a byte** con la simulada: calculada en Python sobre los 530.401 eventos de los nueve datasets, reproduce las seis cifras de ClickHouse exactas.
+  - **Detalle que habría estropeado el resultado en silencio:** los grupos de consumo del 11-09 conservaban sus offsets. Recrear un topic no borra los offsets de los grupos, y `--from-beginning` solo actúa cuando el grupo *no* tiene offset: la detección habría reanudado desde la posición 15.565 de p1 saltándose esos eventos, sin ningún error. Se relanzó con un sufijo de grupo nuevo (`SUFIJO=f3d`).
+- **Resultado — la predicción se cumplió al mensaje.** En Redpanda, el `LOG-END-OFFSET` de las seis particiones fue exactamente el simulado: 88.372 / 87.948 / 88.517 / 88.563 / 88.372 / 88.629. Las seis instancias trabajaron a la vez al 95-100 % de CPU, avanzaron a la par y publicaron entre 185 y 215 alertas cada una (el 11-09: entre 8 y 154). Rendimiento conjunto ~630 eventos/s, unas seis veces una instancia sola. **Es un buen ejemplo de diseño guiado por medición**: se predijo el reparto, se validó el modelo contra el reparto antiguo, se implementó y se confirmó en el sistema real.
+- **Y el 741:**
+
+  | dataset | ahora | antes | diferencia |
+  |---|---|---|---|
+  | SDWIN-200501225525 | **741** | 738 | **+3** |
+  | LSASS_campaign_01 | 134 | 132 | +2 |
+  | LSASS_campaign_03 | 82 | 80 | +2 |
+  | LSASS_campaign_02 | 70 | 70 | 0 |
+  | LSASS_campaign_05 | 46 | 41 | +5 |
+  | LSASS_campaign_04 | 45 | 44 | +1 |
+  | LSASS_campaign_07 | 35 | 34 | +1 |
+  | LSASS_campaign_06 | 21 | 19 | +2 |
+  | SDWIN-201018195009 | 10 | 10 | 0 |
+
+  - **Criterio del 08-09 cumplido.** Las tres alertas de day1 que colapsaban —dos eventos crudos distintos que normalizaban idénticos producían el mismo `alert_id`— reaparecen. **`event_hash` es identidad verdadera.**
+  - **Ninguna diferencia negativa.** Las campañas LSASS ganan de 0 a 5 alertas por el mismo mecanismo: sus alertas antiguas se calcularon sin identidad de evento. No se pierde nada que antes existiera; se recupera lo que se fundía.
+  - **La cifra documentada era la buena.** El ROADMAP y la memoria dicen 741 desde F2. El 08-09 se estuvo a punto de cambiarla a 738 y se descartó por ser un artefacto de la colisión. Hoy queda confirmado que había que dejarla.
+  - Las seis instancias publicaron **1.216** alertas y ClickHouse guarda **1.184** con `FINAL`: las 32 de diferencia son republicaciones en los cortes de confirmación de offsets, absorbidas por `ReplacingMergeTree`. Es el problema del 30-07 —la instancia superviviente reprocesaba y dejaba 752 filas donde había 741 alertas— **resuelto por diseño en lugar de prohibiendo el paralelismo**.
+- **Apunte para después:** la marca de agua de Flink es de 30 s. Con las horas de recogida —desfase de hasta 101 s y σ 26,7 s— **no habría bastado** y se habrían descartado eventos como tardíos. Con la hora corregida —mediana de 0,4 s de error— queda holgada. Otro efecto del arreglo del tiempo del 11-09 que conviene medir cuando se relance P1 en streaming.
+- **Problemas / pendiente:**
+  - **Revalidar P1 (7 de 7) y P2 sobre los datos recargados.** Las alertas de las campañas LSASS han cambiado (+0 a +5) y las horas de apt29 se han corregido. Más evidencia no debería romper la detección de ninguna campaña, pero hay que comprobarlo, no suponerlo. La extensión temporal de las campañas sí cambiará, porque ya no se mide con horas de recogida.
+  - Recalibrar las ventanas de `docs/scenarios/apt29-day1.md` §4 con la hora corregida.
+  - Portar P2 a `MATCH_RECOGNIZE`.
+  - `replay_dataset.py` publica en `raw.host.windows` con su propia clave; no es cuello de botella hoy (la normalización va sobrada), pero conviene revisarla con el mismo criterio.
+- **Archivos tocados:** `pipeline/jobs/normalize_job.py`.
