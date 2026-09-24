@@ -39,6 +39,10 @@
 | Cómputo | Portátil propio para todo el desarrollo; nube solo para fase de despliegue | El portátil (64 GB/16c) es coste hundido y más potente que las VMs de gama media |
 | Despliegue K8s | minikube/kind local; si se quiere nube: Azure for Students / GitHub Student Pack | La prueba GCP de 300 $ ya está gastada y no se puede repetir |
 | Docker | Docker Engine dentro de WSL (no Docker Desktop) | Montaje profesional, igual que en servidores reales |
+| Frontend (F8, extra) | **REVISADA el 23-09-2026.** Stack del portal de PIDS: React 19 + Vite 8 + Tailwind 4 + shadcn/ui + TanStack Query + Recharts; grafos en SVG propio. Cytoscape.js se aplaza al grafo de ataque real (F5); Zustand, innecesario por ahora | Stack ya probado en PIDS; el lienzo del grafo y el redibujado de los cuadros de Grafana se trasladan casi tal cual. El frontend no es núcleo del TFG: es un boceto para enseñar hacia dónde va |
+| Diseño del portal | Paleta **gris de baja luminancia**, sin superficies blancas; color intenso solo para la escala de severidad (sustituye al «tema oscuro» de ROADMAP F8.1) | Herramienta para SOC: el blanco brillante fatiga la vista en turnos largos y resta protagonismo a la severidad. Texto con contraste ≥ 4,5:1 (WCAG AA) |
+| Procedencia de las cifras del portal | Toda cifra lleva chip «documentado» (con su fuente) o «ilustrativo»; las documentadas salen de un único `frontend/src/api/simulado/corpus.ts` | Que ninguna captura haga pasar un dato inventado por uno medido; `corpus.ts` será el oráculo de la primera prueba de integración con la API |
+| Asistente de respuesta | **Las reglas deciden, el LLM solo redacta.** Acciones por motor de reglas determinista (ATT&CK → NIST SP 800-61 / D3FEND, priorizadas y con coste de negocio); el LLM (+RAG, solo inferencia) queda para explicar, sin poder inventar acciones ni cifras | Explicabilidad y auditabilidad (Pilar C); responde a «¿cómo mantienes la explicabilidad con modelos de por medio?» |
 
 ## 3. Convenciones
 - **Entorno:** WSL2 (Ubuntu) como host Docker; `.wslconfig` con `memory=44GB`, `processors=24`, `swap=8GB`; systemd activado (`/etc/wsl.conf`).
@@ -47,6 +51,7 @@
 - **Git:** rama `main` estable; ramas `feat/<fase>` por trabajo; commits pequeños y descriptivos.
 - **Editor:** VS Code + WSL/Remote-SSH; en remoto, sobre Tailscale.
 - **Rutas:** el repo vive en `~/proyectos/tfg-ciberconciencia` (disco Linux, no `/mnt/c`).
+- **Ejecución por agentes (23-09-2026):** en `frontend/` un agente puede instalar, compilar, pasar el linter y los tests de forma autónoma (`npm`), porque es un extra y no toca servicios. El pipeline, los servicios, los topics y las tablas siguen siendo paso a paso, con los comandos ejecutados por Javier. `git commit`/`push` siempre los ejecuta Javier (ver Autoría).
 - **Autoría (REGLA ESTRICTA):** todos los commits son exclusivamente de Javier Saguar <javisaguarantona@gmail.com>. **Ningún agente de IA debe figurar como autor ni co-autor**: prohibido añadir `Co-Authored-By`, "Generated with", "Assisted by" o cualquier atribución similar en mensajes de commit, PRs o código. Ninguna IA debe ejecutar `git commit`/`git push` de forma autónoma; los comandos se proponen y los ejecuta Javier. Guardián técnico: hook `.githooks/commit-msg` (activar tras clonar con `git config core.hooksPath .githooks`).
 
 ## 4. Estado actual
@@ -61,6 +66,7 @@
 - **P1 en streaming (31-07, sesión B): funcionando y emitiendo a `det.campaigns`.** 10 campañas, **7 de 7 variantes también en streaming**, confianza idéntica al oráculo. Circuito cerrado `norm.events → det.alerts → det.campaigns`. Dos divergencias conocidas y explicadas frente al batch (apt29/NASHUA se pierde; el atómico aparece de más).
 - **Hallazgo estructural:** `MATCH_RECOGNIZE` de Flink **no puede expresar una racha maximal abierta** (prohibido el cuantificador voraz al final; el reluctante da la coincidencia mínima). Por eso la correlación en dos niveles deja de ser opción de diseño y pasa a ser requisito de la herramienta.
 - **Divergencias reconciliadas (31-07):** batch y streaming producen las **mismas 11 campañas**. NASHUA se recupera haciendo la transición bidireccional; el atómico se recupera relajando el `HAVING` del oráculo, que penalizaba las capturas limpias — la versión en streaming corrigió a la de referencia. Coinciden en qué campañas hay, **no en su extensión** (el batch absorbe contexto de ±10 min, Flink acota a la evidencia).
+- **Frontend (23-09-2026, extra):** base del portal en `frontend/` con datos simulados — Situación, grafo del pipeline, los cuatro cuadros de Grafana redibujados y una **demo de conciencia situacional** (dos organizaciones, ataque simulado paso a paso, ruta probable hacia las joyas de la corona y asistente de respuesta cuyas acciones cambian el curso del ataque). 81 tests. Detalle en `frontend/README.md`. No bloquea F3.
 - **Siguiente:** P2 (movimiento lateral), que reutiliza la máquina de dos niveles para el salto entre hosts; el caso real es SCRANTON → NASHUA a las 03:09:24. Pendientes de fondo: `stages[]` sin emitir, contadores `trans_*` que cuentan transiciones y no alertas, `EventRecordID` en el normalizador, versionar los scripts del laboratorio, apt29 day2.
 
 
@@ -90,6 +96,7 @@ tfg-ciberconciencia/
 ├── scoring/             # priorización explicable
 ├── eval/                # referencias a datasets, métricas, notebooks
 ├── emulation/           # Atomic Red Team, escenarios CALDERA
+├── frontend/            # portal web (F8): base con datos simulados
 └── data/                # git-ignored (working set; fríos en disco externo)
 ```
 
@@ -681,3 +688,42 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - Explicar las alertas de `impact` en NASHUA anteriores al salto.
   - Portar P2 a `MATCH_RECOGNIZE`.
 - **Archivos tocados:** `docs/scenarios/apt29-day1.md`.
+
+### 2026-09-23 — Base del frontend: grafo del pipeline y observabilidad, sin backend
+- **Con qué/quién:** Claude Code. Por decisión de Javier, la instalación de dependencias y la base del frontend las hizo el agente de forma autónoma (solo `npm` dentro de `frontend/`, sin tocar servicios, topics ni tablas).
+- **Objetivo:** montar la base del portal (F8) tomando como modelo el de PIDS (`PIDS-Proyecto1/parte4_frontend`), en particular su grafo de arquitectura y el redibujado de los cuadros de Grafana, aunque todavía no haya API a la que conectarlo.
+- **Hecho:**
+  - **`frontend/`**, con tres secciones: *Situación* (cifras del corpus de F3, las doce campañas del oráculo en batch y el avance por fases), *Grafo del pipeline* (14 piezas con su ficha y sus ficheros del repo) y *Observabilidad* (los cuatro cuadros de `infra/grafana/dashboards` en su rejilla de 24 columnas). Las secciones de fases futuras existen ya como páginas «próximamente» con su fase, para que la navegación final quede fijada desde la base.
+  - **El grafo es también el mapa del ROADMAP:** las piezas operativas (F1–F3) van sólidas y las planificadas (CTI, grafo de ataque, priorización, API) en discontinua con su fase. Las aristas llevan el nombre del topic o de la tabla por la que pasa el dato. Un botón simula el replay de apt29 day1 e ilumina los tramos activos hasta los totales medidos.
+  - **Tres tipos de panel nuevos respecto a PIDS** porque los cuadros del TFG los usan: tabla, indicador (gauge) y grafo de nodos (el salto SCRANTON → NASHUA con sus 17 aristas y el mapa IP → host).
+  - **Verificación:** TypeScript y ESLint limpios, tests en verde (Vitest) y build de producción. Revisión visual con capturas de Chromium headless de las tres secciones y los cuatro cuadros; de ahí salieron tres arreglos (un panel de CPU demasiado bajo que cortaba el eje, ruido excesivo en las series y un porcentaje con punto decimal).
+- **Decisiones** (recogidas también en §2):
+  - **Stack de PIDS en vez del de ROADMAP F8.1:** React 19 + Vite 8 + Tailwind 4 + shadcn/ui + TanStack Query + Recharts, y el grafo en SVG propio. Cytoscape.js se aplaza al grafo de ataque de F5, que sí tendrá cientos de nodos; Zustand no hace falta aún. Anotado en el ROADMAP.
+  - **Paleta gris, no blanca.** Petición expresa de Javier: es una herramienta para SOC, y las superficies blancas y brillantes fatigan la vista en turnos largos y restan protagonismo a los colores de severidad. Ningún plano grande es blanco (fondo `#dde2e8`, tarjetas `#eceff3`), el texto es pizarra y no negro puro, el suave mantiene 5,2:1 de contraste (WCAG AA) y el color intenso se reserva para una escala de severidad propia. Documentado en `frontend/README.md` §Diseño; sustituye al «tema oscuro» que pedía el ROADMAP.
+  - **Cada cifra dice de dónde sale.** Todo lo que el portal enseña como «documentado» sale de un único fichero, `src/api/simulado/corpus.ts`, con la referencia de la entrada de bitácora o del fichero donde está medida. Solo las métricas de Prometheus (tráfico, memoria, CPU) son «ilustrativas», y lo pone un chip en cada panel. Lo no documentado se deja vacío en vez de inventarlo: los eventos por campaña LSASS salen como «—» porque la bitácora da la lista sin decir cuál es cuál.
+  - **Una sola puerta de datos** (`src/api/`): las páginas consumen hooks de TanStack Query y nunca el simulador, así que conectar la API de F6.3 será cambiar cada `queryFn` por un `fetch`, sin tocar páginas.
+- **Comprobación cruzada que salió gratis:** al reunir las cifras en `corpus.ts`, los tests reprodujeron las sumas de la bitácora sin tocar ClickHouse. Las alertas por dataset suman 1.184, y consumidos = normalizados + DLQ (550.494 = 530.401 + 20.093). Además, las campañas de P1 suman 512 + 115 + 116 + 433 + 10 = 1.186, que menos las 22 contadas dos veces da las 1.164 del 15-09. De esa última cuenta se derivan dos cifras que no estaban escritas explícitamente: la campaña P1 de NASHUA absorbe **115** alertas (743 − 512 − 116) y cada campaña LSASS absorbe **todas** las alertas de su dataset (1.164 − 721 = 443 = 433 + 10). Van marcadas como derivadas en el código.
+- **Problemas / pendiente:**
+  - `npm install` falló con un error interno del resolvedor de npm (`Cannot read properties of null (reading 'edgesOut')`); se sorteó partiendo del `package-lock.json` de PIDS, que ya estaba resuelto con las mismas versiones.
+  - Conectar a la API cuando exista (F6.3); `corpus.ts` pasará entonces a ser el oráculo de la primera prueba de integración: la API tiene que devolver esas mismas cifras.
+  - Marca definitiva (F8.0): «Ciberconciencia» y el logotipo son provisionales.
+  - La tabla «Estado actual» del `README.md` raíz sigue en F2 «en curso» y F3 «pendiente», y §4 de esta bitácora se quedó en el 31-07 salvo la línea del frontend: conviene ponerlos al día en una pasada aparte.
+- **Siguiente paso:** retomar F3 donde se dejó (portar P2 a `MATCH_RECOGNIZE`); el frontend no bloquea nada.
+- **Archivos tocados:** `frontend/` (nuevo), `docs/ROADMAP.md` (F8.1), `README.md` (estructura).
+
+### 2026-09-23 (2) — Demo de conciencia situacional: ataque simulado y asistente de respuesta
+- **Con qué/quién:** Claude Code, de forma autónoma dentro de `frontend/` (Javier fijó que el frontend es un extra del TFG, un boceto para la reunión con la tutora, y que ese trabajo puede hacerse sin guiar).
+- **Objetivo:** enseñar cómo se vería la conciencia cibersituacional: qué parte de la organización está atacando el adversario, representado como grafo, con un botón que simula un ciberataque y un asistente que, viendo el ataque en tiempo real, dice qué respuesta inmediata dar para mitigarlo.
+- **Hecho:**
+  - **Sección `/conciencia`**, que sustituye a la página «próximamente» del grafo de ataque. La organización se dibuja por zonas de red (Internet → perímetro → puestos → servidores → activos críticos) con el área de negocio de cada activo y sus joyas de la corona. Encima se ven los pasos del ataque según ocurren, los que la respuesta impide (tachados, con el motivo) y la ruta más probable hacia la siguiente joya.
+  - **Varias organizaciones a la vez**, cada una con su propia simulación: se puede lanzar un ataque en una, cambiar a otra y volver, y la tarjeta de cada una dice si está en calma, bajo ataque, contenida o con el objetivo alcanzado. Hay dos. *Helios Farmacéutica* es **ficticia** y está diseñada para recorrer los tres pilares en un solo ataque: phishing, C2, P1, P2, DCSync, exfiltración de I+D, borrado de copias, sabotaje OT y ransomware. *DMEVALS* es el dominio de **APT29 day1** ampliado: sus pasos hasta las 03:19 son los medidos y están marcados como documentados, y lo posterior es extrapolación ilustrativa.
+  - **Asistente de respuesta** con tres piezas: una situación redactada, la gravedad 0–100 **descompuesta en cinco factores** (anticipo del Pilar C) y acciones priorizadas por fase NIST SP 800-61 y táctica D3FEND, cada una con su evidencia y su **coste de negocio**. «Aplicar» cambia el curso del ataque desde ese momento; responder tarde no deshace lo ocurrido.
+  - `?t=<segundo>` abre la simulación en pausa en un instante concreto, útil para la reunión: `/conciencia?org=helios&t=62` es justo después del DCSync.
+- **Decisiones** (recogidas también en §2):
+  - **Las reglas deciden, el LLM solo redacta.** Las acciones las elige un motor de reglas determinista y auditable. El hueco del LLM (con RAG sobre ATT&CK, D3FEND y playbooks, solo inferencia) está preparado en `asistente/redactor.ts` para explicar, nunca para decidir ni inventar cifras. Es una respuesta directa a «¿cómo mantienes la explicabilidad con modelos de por medio?».
+  - **La ruta probable es una búsqueda en anchura** sobre la alcanzabilidad de red. En F5 la sustituirá Datalog (MulVAL) con trazabilidad; la interfaz que consume la ruta no cambiará.
+  - Toda la lógica son funciones puras sobre (organización, instante, acciones), así que pausar, cambiar de organización o saltar a un segundo es solo volver a evaluar.
+  - **Autonomía del agente en `frontend/`:** al ser un extra, el agente puede instalar, compilar y probar sin guiar (anotado en §3). El pipeline sigue siendo paso a paso y los commits los hace Javier.
+- **Verificación:** 81 tests (30 nuevos), TypeScript, ESLint y build limpios, más capturas de Chromium headless. Algunos tests comprueban la coherencia de los escenarios: el atacante no se teletransporta (todo salto sigue un enlace de red) y ningún paso se queda sin respuesta propuesta. Las capturas destaparon tres fallos, ya corregidos: líneas que atravesaban tarjetas de la misma columna, un salto de DMEVALS que tapaba a UTICA y, el más importante, un **error de criterio del asistente**, que tras el DCSync priorizaba «blindar BACKUP-01» por delante de restablecer krbtgt. Ahora hay un test que exige que, con el dominio robado, lo primero sea expulsar al atacante.
+- **Problemas / pendiente:** los escenarios son guiones fijos; con backend, las campañas saldrán de `det.campaigns`, la ruta de Datalog y la redacción del LLM. Las dos organizaciones pasarán a ser tenants (F8.2).
+- **Archivos tocados:** `frontend/src/paginas/conciencia/` (nuevo), `frontend/src/componentes/shell/{navegacion.ts,AppShell.tsx}`, `frontend/src/rutas.tsx`, `frontend/README.md`.
