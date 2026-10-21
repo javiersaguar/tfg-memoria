@@ -1,0 +1,249 @@
+% Chuleta de 2 páginas para la reunión con la tutora · compilar: latexmk -pdf chuleta.tex
+\documentclass[9pt,a4paper]{extarticle}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-noshorthands]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[a4paper,margin=1.15cm,top=1.0cm,bottom=1.0cm]{geometry}
+\usepackage{xcolor}
+\usepackage{tabularx,booktabs,array}
+\usepackage{multicol}
+\usepackage{enumitem}
+\usepackage[most]{tcolorbox}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{azul}{HTML}{2C5592}
+\definecolor{verde}{HTML}{22674A}
+\definecolor{ambar}{HTML}{80561A}
+\definecolor{rojo}{HTML}{8D2E26}
+\definecolor{violeta}{HTML}{57458C}
+\definecolor{gris}{HTML}{4F5B6A}
+\definecolor{fondo}{HTML}{ECEFF3}
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.25em}
+\setlength{\columnsep}{0.5cm}
+\setlist{nosep,leftmargin=1em}
+\renewcommand{\arraystretch}{1.12}
+\sloppy
+
+\newcommand{\cod}[1]{\texttt{#1}}
+\newcommand{\fl}{$\rightarrow$}
+\newcommand{\titulo}[1]{\vspace{0.2em}{\large\bfseries\color{azul}#1}\par\vspace{0.1em}{\color{azul}\hrule height 0.6pt}\vspace{0.35em}}
+
+% Tarjeta de fase: {Fx}{nombre}{estado}{color}{contenido}
+\newtcolorbox{fase}[4]{enhanced,breakable=false,boxrule=0.5pt,arc=1.5pt,
+  left=4pt,right=4pt,top=2pt,bottom=2pt,colback=#4!6,colframe=#4,
+  fonttitle=\bfseries\small,title={#1 · #2\hfill\normalfont\small #3},
+  before skip=3pt,after skip=3pt}
+
+\newcommand{\hecho}{\textbf{hecha}}
+\newcommand{\curso}{\textbf{en curso}}
+\newcommand{\pend}{pendiente}
+
+\begin{document}
+
+% =============================================================================
+% CABECERA
+% =============================================================================
+\begin{tcolorbox}[enhanced,colback=azul,colframe=azul,arc=2pt,left=6pt,right=6pt,top=4pt,bottom=4pt]
+\color{white}
+{\Large\bfseries Plataforma de conciencia cibersituacional}\hfill{\small Javier Saguar Antona · ETSIT-UPM · TFG 2026–27}\\[2pt]
+\small Pipeline de datos en tiempo real que convierte telemetría cruda en \textbf{incidentes correlacionados,
+contextualizados y priorizados con explicación}. Tres pilares: \textbf{A} detección multi-etapa (CEP) ·
+\textbf{B} grafo de ataque razonado (Datalog) · \textbf{C} priorización explicable.
+\end{tcolorbox}
+
+\begin{multicols}{2}
+
+\titulo{El problema y la idea}
+\begin{itemize}
+  \item \textbf{Fatiga de alertas}: el SOC recibe más alertas de las que puede revisar. Dato propio:
+        \textbf{una regla genera 292 alertas (39\,\%) en APT29} por \textit{una sola} acción del atacante.
+  \item \textbf{Sin contexto}: la alerta no dice qué técnica es, quién la usa ni qué activos peligran.
+  \item \textbf{Ataques multi-etapa}: la evidencia es la \textit{secuencia}, no el evento suelto.
+  \item \textbf{Aportación = integración}: unir detección de secuencias en tiempo real + razonamiento sobre
+        rutas con evidencia observada + priorización justificada. Encaja con la conciencia situacional de
+        Endsley: \textit{percibir} (A) · \textit{comprender} (B) · \textit{proyectar} (C).
+  \item \textbf{Núcleo defendible}: A + B + evaluación. Validación con datasets públicos con \textbf{verdad
+        conocida} (MITRE Evals APT29, OTRF) y un laboratorio propio.
+\end{itemize}
+
+\titulo{Los tres pilares}
+\small
+\begin{tabularx}{\linewidth}{>{\bfseries}l X l}
+\toprule
+Pilar & Qué aporta & Fase \\
+\midrule
+A · Multi-etapa & Detecta \textit{secuencias} de la kill chain con CEP, no alertas sueltas & F3 \\
+B · Grafo & Rutas factibles hacia los activos críticos, con trazabilidad lógica & F5 \\
+C · Priorización & Puntuación descompuesta en factores + un «por qué» legible & F6 \\
+\bottomrule
+\end{tabularx}
+
+\textbf{Qué NO es}: no es un EDR (consume telemetría), no compite en cobertura con un SIEM comercial y
+hoy \textbf{no ejecuta respuesta}: es soporte a la decisión (la propuesta del agente autónomo revisaría esto).
+\normalsize
+
+\titulo{Recorrido del dato}
+\small
+Datasets \fl{} \textbf{Replay} \fl{} \cod{raw.host.windows} \fl{} \textbf{Normalización OCSF} \fl{}
+\cod{norm.events} \fl{} \textbf{Detección Sigma} \fl{} \cod{det.alerts} \fl{} \textbf{CEP Flink} \fl{}
+\cod{det.campaigns} \fl{} \textit{grafo (B)} \fl{} \textit{priorización (C)} \fl{} \textit{API} \fl{} \textit{portal}.
+Todo se persiste en \textbf{ClickHouse}; lo no procesable va a \cod{dlq.*} con su motivo (nada se descarta en silencio).
+\normalsize
+
+\titulo{Las fases}
+
+\begin{fase}{F0}{Entorno}{\hecho}{verde}
+WSL2 + Docker Engine, dos repos (código y memoria), hook que garantiza la autoría de los commits.
+\end{fase}
+
+\begin{fase}{F1}{Ingesta, OCSF, persistencia, observabilidad}{\hecho}{verde}
+Replay de datasets a Redpanda; normalización a OCSF de $\sim$35 tipos de evento de Windows
+(\textbf{100\,\%} en el dataset de referencia, \textbf{99,4\,\%} en APT29); señales precalculadas
+(\cod{signal\_*}) como semilla de la explicabilidad; ClickHouse; Prometheus + Grafana declarativos.
+\end{fase}
+
+\begin{fase}{F2}{Detección con reglas Sigma + ML-1}{\hecho{} (30-07)}{verde}
+Pipeline Sigma\fl OCSF \textbf{propia} (la oficial tenía 3 desviaciones); evaluador en memoria
+\textbf{73$\times$} más rápido. APT29: \textbf{741 alertas}, 4 hosts, 33 técnicas. Línea base ingenua
+741\fl87 (88,3\,\%). Cobertura ATT\&CK: 300 técnicas posibles, 34 observadas. ML-1 (Isolation Forest)
+AUC 0,995, pero el \textbf{control de solo volumen da 0,941}: separabilidad en parte artefacto del dataset.
+Laboratorio propio: 14.895 eventos etiquetados.
+\end{fase}
+
+\begin{fase}{F3}{Pilar A — detección multi-etapa (CEP)}{\curso}{azul}
+Corpus reproducible (530.401 eventos, 9 datasets, 1.184 alertas). Cada patrón: \textbf{oráculo en batch}
+(ClickHouse) y luego \textbf{streaming} (Flink).
+\textbf{P1 robo de credenciales}: batch y Flink, \textbf{7 de 7} variantes LSASS (ancla \cod{T1003.*};
+con \cod{T1003.001} solo 6, falla Mimikatz). Hallazgo: \cod{MATCH\_RECOGNIZE} no expresa rachas abiertas
+\fl{} \textbf{correlación en dos niveles}.
+\textbf{P2 movimiento lateral}: en batch, salto SCRANTON\fl NASHUA (17 aristas Sysmon 3, confianza 1,0).
+Arreglados: identidad de evento, hora de recogida (hasta 101\,s de error), particionado.
+\textit{Falta}: P2 en Flink, P3, P4, falsos positivos, latencia.
+\end{fase}
+
+\begin{fase}{F4}{Plano CTI + extracción de TTPs (ML-2)}{\pend}{gris}
+OpenCTI (STIX 2.1) con ATT\&CK y feeds de IOCs. ML-2: afinar SecureBERT para pasar de informes en
+lenguaje natural a técnicas ATT\&CK (encaja con la línea NLP del grupo). Plan B: ATT\&CK directo a Neo4j.
+\end{fase}
+
+\begin{fase}{F5}{Pilar B — grafo de ataque razonado (ML-3)}{\pend}{gris}
+Neo4j con hosts, cuentas, servicios, vulnerabilidades, alertas y CTI; analítica GDS (centralidad,
+caminos). Reglas \textbf{Datalog estilo MulVAL} en Soufflé que usan la \textbf{evidencia observada}.
+ML-3: predicción de enlaces con GNN; \textit{el modelo propone, Datalog verifica}.
+\end{fase}
+
+\begin{fase}{F6}{Pilar C — priorización explicable + API (ML-4)}{\pend}{gris}
+Puntuación = suma ponderada de factores legibles (confianza, táctica, criticidad del activo, cercanía en
+la ruta, CTI, EPSS, anomalía) + narrativa. ML-4: aprender los pesos (con SHAP). FastAPI.
+\textcolor{violeta}{\textbf{Propuesta nueva}: agente de respuesta autónoma acotada (F6.4).}
+\end{fase}
+
+\begin{fase}{F7}{Evaluación cuantitativa}{\pend}{rojo}
+Protocolo escrito \textit{antes}. Detección, reducción de alertas, priorización, razonamiento,
+rendimiento y ML, contra 4–5 líneas base (solo Sigma, sin anomalías, severidad de regla, Wazuh\ldots).
+\end{fase}
+
+\begin{fase}{F8}{Portal web (extra)}{base hecha}{ambar}
+React con datos \textbf{simulados}: situación, grafo del pipeline, cuadros de Grafana y demo de
+conciencia situacional con asistente de respuesta (\textit{las reglas deciden, el LLM solo redacta}).
+\end{fase}
+
+\begin{fase}{F9}{Despliegue, memoria y defensa}{\pend}{gris}
+Kubernetes local (minikube/kind), \cod{make demo}, memoria y presentación con vídeo.
+\end{fase}
+
+\small
+\textbf{Hitos}: \textbf{30-nov} F3 funcionando · \textbf{28-feb} núcleo (F3 + F5 simbólico), punto de no retorno ·
+\textbf{15-may} memoria a la tutora · \textbf{jun-2027} defensa. Si el calendario aprieta, el ML se recorta
+en orden ML-4 \fl{} ML-1 \fl{} ML-3 \fl{} ML-2.
+\normalsize
+
+\end{multicols}
+
+\newpage
+% =============================================================================
+% PÁGINA 2: TECNOLOGÍAS
+% =============================================================================
+\begin{tcolorbox}[enhanced,colback=azul,colframe=azul,arc=2pt,left=6pt,right=6pt,top=3pt,bottom=3pt]
+\color{white}{\large\bfseries Tecnologías: qué son y por qué se usan}\hfill{\small Por qué cada pieza, en una línea}
+\end{tcolorbox}
+
+\small
+\renewcommand{\arraystretch}{1.16}
+\newcolumntype{Q}{>{\raggedright\arraybackslash}p{2.75cm}}
+\newcolumntype{W}{>{\raggedright\arraybackslash}X}
+\begin{tabularx}{\linewidth}{Q W W >{\raggedright\arraybackslash}p{2.1cm}}
+\toprule
+\textbf{Tecnología} & \textbf{Qué es} & \textbf{Por qué esta} & \textbf{En vez de} \\
+\midrule
+\multicolumn{4}{l}{\textbf{\color{azul}Datos y estándares de seguridad}}\\
+\textbf{MITRE ATT\&CK} & Catálogo de tácticas, técnicas y subtécnicas de atacantes reales & Idioma común entre reglas, datos, CTI e informes; el orden de tácticas da la progresión del ataque & --- \\
+\textbf{OCSF} & Esquema abierto para normalizar eventos de seguridad (\cod{class\_uid}, \cod{unmapped}) & Desacopla la detección del formato de origen: una fuente nueva = un mapeador, sin tocar reglas & formato nativo \\
+\textbf{Sigma + pySigma} & Formato abierto de reglas + biblioteca que las adapta a un modelo de datos & Miles de reglas de la comunidad ya etiquetadas con ATT\&CK; pipeline OCSF propia (la oficial tenía 3 fallos) & reglas propias \\
+\textbf{Sysmon} & Telemetría ampliada de Windows (procesos, red, ficheros) & Es la fuente de los datasets; el EID 3 da la arista de red para el movimiento lateral & solo logs nativos \\
+\textbf{OTRF / MITRE Evals} & Datasets públicos de ataques grabados (APT29, LSASS) & \textbf{Verdad conocida}: se sabe qué hizo el atacante, cuándo y dónde & datos reales \\
+\textbf{Atomic Red Team} + VirtualBox & Pruebas atómicas de técnicas en una VM aislada & Actividad benigna sostenida y técnicas dirigidas para medir falsos positivos & malware real \\
+\midrule
+\multicolumn{4}{l}{\textbf{\color{azul}Ingesta, procesado y almacenamiento}}\\
+\textbf{Redpanda} & Bus de eventos compatible con la API de Kafka & Binario único sin JVM ni ZooKeeper: ligero en un portátil; topics \cod{raw}\fl\cod{norm}\fl\cod{det}\fl\cod{enr} & Kafka \\
+\textbf{Python + confluent-kafka} & Replay, normalización, detección y sinks & Rápido de desarrollar; la lógica de mapeo es la misma en batch y en streaming & PyFlink en esa etapa \\
+\textbf{Apache Flink 2.2.1} & Motor de streaming con estado y tiempo de evento & El CEP necesita estado, tiempo de evento y marcas de agua; Flink es streaming nativo & Spark (micro-lotes) \\
+\textbf{SQL \cod{MATCH\_RECOGNIZE}} & Reconocimiento de patrones de filas (SQL:2016) & Declarativo y usable sin Java; validado con prueba de humo antes de comprometerlo & Pattern API (Java) \\
+\textbf{ClickHouse} & Base de datos columnar OLAP & Agregaciones rápidas sobre millones de eventos; aloja los oráculos en batch; \cod{ReplacingMergeTree} deduplica por identidad & Cassandra, Elastic \\
+\midrule
+\multicolumn{4}{l}{\textbf{\color{azul}Razonamiento e inteligencia (fases futuras)}}\\
+\textbf{Neo4j + GDS} & Base de datos de grafos de propiedades + analítica & Estándar de facto en seguridad (BloodHound); centralidad, caminos y comunidades & RDF / SPARQL \\
+\textbf{Datalog (Soufflé), estilo MulVAL} & Lógica: hechos + reglas \fl{} estados alcanzables & Enfoque canónico en grafos de ataque; \textbf{cada conclusión trae su árbol de derivación} (explicable) & motor de reglas, OWL \\
+\textbf{OpenCTI / STIX 2.1} & Plataforma y lenguaje estándar de inteligencia de amenazas & Grafo CTI nativo con conector de ATT\&CK y feeds de IOCs & MISP solo \\
+\textbf{SecureBERT / TRAM} & Modelos de lenguaje del dominio de seguridad & Extraer técnicas de informes; cabe en la GPU del portátil ($\sim$110M parámetros) & LLM grande \\
+\midrule
+\multicolumn{4}{l}{\textbf{\color{azul}Aprendizaje automático}}\\
+\textbf{scikit-learn} (Isolation Forest, RF, SMOTE) & Detección de anomalías por ventana de host & Detecta lo inusual sin regla; \textbf{no genera alertas}, eleva la confianza de una campaña & --- \\
+\textbf{MLflow} & Registro de experimentos & Reproducibilidad: parámetros, métricas y semillas de cada ejecución & hojas sueltas \\
+\midrule
+\multicolumn{4}{l}{\textbf{\color{azul}Plataforma, observabilidad e infraestructura}}\\
+\textbf{Prometheus + Grafana} & Métricas y cuadros de mando & Observabilidad de cada pieza; cuadros aprovisionados desde ficheros (reproducibles) & --- \\
+\textbf{FastAPI} / \textbf{Dagster} & API REST / orquestación por \textit{assets} & Asíncrono, tipado y con OpenAPI / moderno y orientado a datos & Flask / Airflow \\
+\textbf{React + Vite + Tailwind} & Portal web del analista (extra) & Stack ya probado en otra asignatura; boceto para enseñar hacia dónde va & React 18 + Cytoscape \\
+\textbf{Docker en WSL2} (perfiles) & Todos los servicios en contenedores en un solo host & Sin sobrecoste de una VM por servicio; se levanta solo lo que pide cada fase & VMs, nube \\
+\bottomrule
+\end{tabularx}
+\normalsize
+
+\vspace{0.4em}
+\begin{multicols}{2}
+\begin{tcolorbox}[enhanced,colback=fondo,colframe=gris,boxrule=0.5pt,arc=1.5pt,left=4pt,right=4pt,top=2pt,bottom=2pt,fonttitle=\bfseries\small,title=Principios de diseño]
+\small
+\begin{itemize}
+  \item \textbf{El modelo propone, la lógica dispone}: ningún componente opaco decide solo (ML, LLM).
+  \item \textbf{Oráculo antes que streaming}: cada patrón se valida contra su versión en batch.
+  \item \textbf{Medir antes de decidir}: ventanas, anclas y particionado salen de los datos.
+  \item \textbf{Nada se descarta en silencio}: DLQ con motivo; cada cifra con su procedencia.
+\end{itemize}
+\end{tcolorbox}
+\columnbreak
+\begin{tcolorbox}[enhanced,colback=fondo,colframe=rojo,boxrule=0.5pt,arc=1.5pt,left=4pt,right=4pt,top=2pt,bottom=2pt,fonttitle=\bfseries\small,title=Cifras para tener a mano]
+\small
+\begin{itemize}
+  \item 530.401 eventos · 1.184 alertas · 741 en APT29 · 12 campañas (11 P1 + 1 P2).
+  \item P1: \textbf{7/7} variantes LSASS · P2: SCRANTON\fl NASHUA, 17 aristas, 516\,s.
+  \item Reducción 0,991 \textbf{solo en el alcance de P1}: \textit{no} comparable con el 88,3\,\%.
+  \item Falsos positivos de los patrones y latencia: \textbf{aún sin medir}.
+\end{itemize}
+\end{tcolorbox}
+\end{multicols}
+\begin{tcolorbox}[enhanced,colback=violeta!6,colframe=violeta,boxrule=0.5pt,arc=1.5pt,left=4pt,right=4pt,top=2pt,bottom=2pt,fonttitle=\bfseries\small,title=Propuesta para hablar: agente de respuesta autónoma acotada (F6.4)]
+\small
+Hoy el asistente \textbf{recomienda} (aislar equipo, bloquear cuenta, cortar el C2) y decide el analista. Propuesta: que un agente
+\textbf{ejecute} acciones reversibles y de bajo coste por sí mismo, dentro de una \textbf{política declarativa} (Datalog) y con
+catálogo cerrado de acciones; el LLM nunca decide (la telemetría la escribe el atacante). Argumento: en APT29 pasan
+\textbf{4 min 7 s} entre el acceso a LSASS (P1, confianza 0,85) y el salto a NASHUA. Requiere revisar la decisión
+«solo soporte a la decisión» y evaluarlo en el simulador frente a un analista con distintas latencias.
+\end{tcolorbox}
+
+\end{document}
