@@ -67,6 +67,7 @@
 - **Hallazgo estructural:** `MATCH_RECOGNIZE` de Flink **no puede expresar una racha maximal abierta** (prohibido el cuantificador voraz al final; el reluctante da la coincidencia mínima). Por eso la correlación en dos niveles deja de ser opción de diseño y pasa a ser requisito de la herramienta.
 - **Divergencias reconciliadas (31-07):** batch y streaming producen las **mismas 11 campañas**. NASHUA se recupera haciendo la transición bidireccional; el atómico se recupera relajando el `HAVING` del oráculo, que penalizaba las capturas limpias — la versión en streaming corrigió a la de referencia. Coinciden en qué campañas hay, **no en su extensión** (el batch absorbe contexto de ±10 min, Flink acota a la evidencia).
 - **Frontend (23-09-2026, extra):** base del portal en `frontend/` con datos simulados — Situación, grafo del pipeline, los cuatro cuadros de Grafana redibujados y una **demo de conciencia situacional** (dos organizaciones, ataque simulado paso a paso, ruta probable hacia las joyas de la corona y asistente de respuesta cuyas acciones cambian el curso del ataque). 81 tests. Detalle en `frontend/README.md`. No bloquea F3.
+- **Mapa mundial del boceto (21-10-2026):** `/mapa`, flujo geográfico ilustrativo de Helios con rutas animadas, pausa, filtros, zoom y detalle. Cartografía local; sin geolocalizar las IP privadas de APT29 ni conectarse a servicios externos. Detalle en la última entrada del diario.
 - **Siguiente:** P2 (movimiento lateral), que reutiliza la máquina de dos niveles para el salto entre hosts; el caso real es SCRANTON → NASHUA a las 03:09:24. Pendientes de fondo: `stages[]` sin emitir, contadores `trans_*` que cuentan transiciones y no alertas, `EventRecordID` en el normalizador, versionar los scripts del laboratorio, apt29 day2.
 
 
@@ -802,3 +803,35 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Problemas / pendiente:** el grafo de ataque con todo el día a la vista sigue teniendo texto pequeño (el detalle se ve con «Reproducir ataque» y el zoom). §4 de esta bitácora sigue desfasada.
 - **Siguiente paso:** guardar la ronda (`save.sh`), ensayar la presentación antes de la reunión y volver al núcleo (P2 en Flink, P3/P4, falsos positivos).
 - **Archivos tocados:** `frontend/` (`src/componentes/presentacion/` nuevo, `src/copiloto/estado.ts` y `estado.test.ts`, `src/componentes/shell/{AppShell,BarraSuperior,comandos}`, `src/api/simulado/corpus.ts`, `src/paginas/ataque/carriles.ts`, `src/estilos/globales.css`, `e2e/portal.spec.ts`, `README.md`, `docs/plan-mejora.md`), `.claude/skills/cybersecurity-dashboard/SKILL.md`, `docs/ROADMAP.md`, `BITACORA.md`.
+
+
+### 2026-10-21 (5) — Mapamundi animado en el boceto del frontend
+- **Con qué/quién:** sesión de desarrollo del frontend autorizada por Javier, dentro del alcance de F8.
+- **Objetivo:** añadir un mapa mundial donde ver de qué parte a qué parte del mundo viajan las alertas, animadas y en directo en el boceto.
+- **Hecho:**
+  - Nueva sección **Demo → Mapa mundial**, ruta /mapa, también disponible en Ctrl+K. Cabecera y detalle identifican de forma explícita el flujo geográfico ficticio de Helios: ninguna coordenada se deduce de las IP privadas del corpus.
+  - SVG con 177 geometrías de Natural Earth, guardadas localmente con su fuente y SHA-256. d3-geo calcula la proyección y las rutas geodésicas, recortadas en el antimeridiano para que el salto del Pacífico no atraviese Europa. Script manual actualizar-cartografia.mjs para regenerar el fichero; no se descarga cartografía al abrir la página.
+  - Partículas del origen al destino y anillo de llegada, reloj local con pausa real, velocidades 1×/2×/4×, reinicio y suspensión al ocultar la pestaña. Solo transform y opacity por fotograma, sin renders de React por fotograma.
+  - Filtros por severidad y país en la URL, indicadores sobre sesenta segundos y lista reciente acotada. Seleccionar una alerta fija su detalle mientras llegan nuevas. Zoom y arrastre, tabla alternativa y selección por teclado; movimiento reducido con flechas estáticas.
+  - Carga diferida de geografía y datos. Al inspeccionar el build se detectó que el grupo genérico de d3 arrastraba Recharts al mapa; corregido separando geografia y moviendo d3-array/internmap al grupo pequeño compartido.
+- **Decisiones:** el tiempo real del boceto es un flujo local ilustrativo. El tiempo real de producción conserva sus requisitos: IP públicas, GeoIP en el servidor y flujo de alertas de F6.3. No se ha creado backend ni simulado un WebSocket. La ubicación de una IP no atribuye el ataque a un país.
+- **Verificación:** 422 pruebas unitarias en 40 ficheros, lint y build correctos. Playwright: 64 correctas y 2 saltos previstos, con doce comprobaciones nuevas del mapa en 1280, 1440 y 1920 px. Animación real, pausa, filtros, detalle estable, zoom, teclado, movimiento reducido, ausencia de peticiones externas y carga diferida; capturas de los dos temas revisadas. Contraste de texto y rutas activas sobre el mapa añadido a la comprobación AA.
+- **Problemas / pendiente:** integrar telemetría geolocalizable cuando exista; este mapa no cambia el estado de F3, F5 ni F6. Se mantienen los once avisos anteriores de npm audit.
+- **Archivos tocados:** frontend/src/api/mapa.ts, frontend/src/api/simulado/mapa.ts, frontend/src/paginas/mapa/, navegación y rutas del portal, frontend/vite.config.ts, frontend/src/estilos/contraste.test.ts, frontend/e2e/mapa.spec.ts, frontend/scripts/actualizar-cartografia.mjs y dependencias; frontend/README.md, frontend/docs/plan-mejora.md, skill del portal, docs/ROADMAP.md y BITACORA.md.
+
+### 2026-10-24 — Portal: la rama `frontend` a `main`, unificada con la versión anterior
+- **Con qué/quién:** Claude Code, por indicación de Javier (llevar la rama a `main`, traerla a local y no perder nada de la versión anterior).
+- **Hecho:**
+  - La rama `origin/frontend` (3 commits del 24-10, firmados por Javier: ronda 4 con maqueta 3D, grafo de ataque por columnas, logo y sobriedad; maqueta realista con cámara que sigue el ataque y panel «Por qué»; trazas vivas en 2D y el mundo en mapa 2D y globo 3D) entró en `main` por **avance rápido** y se subió (`f08eaee..6c3a252`), a petición expresa de Javier. Sin commits nuevos ni atribuciones.
+  - En local había trabajo sin guardar del 21-10: la página **«Mapa mundial» (`/mapa`)**, que un agente dejó tras la ronda 3. Se apartó en un *stash* y, tras ver Javier que faltaba, se **restauró** sobre `main`, resolviendo conflictos en README, skill, roadmap, plan y `vite.config.ts` (chunks `geografia`, `d3-comun` y `tresd` juntos).
+  - **Unificación** decidida con Javier: lo nuevo se queda y lo anterior vuelve como opción.
+    - Grafo de ataque: selector «Cámara: Seguir el ataque (por defecto) / Quieta», que recupera el movimiento que acompañaba cada paso.
+    - Grafo de ataque: selector «Eje: Por momentos (por defecto) / Tiempo real», que recupera el eje a escala.
+    - Grafo de ataque: lista de elementos abierta de entrada.
+    - Mapas: `/mapa` y la vista «Mundo» enlazadas en los dos sentidos.
+    - Estilo: se mantiene lo sobrio.
+  - **Verificación:** 466 tests unitarios, ESLint y build limpios; Playwright 80 en verde en tres anchos.
+- **Problema encontrado:** con el stack de PIDS levantado (Airflow, Spark, Mongo…), las baterías completas fallaban por *timeouts* incluso en la versión anterior (40 fallos en una que el 21-10 pasaba en 6 s). No era una regresión: con menos hilos y más margen pasan todas.
+- **Decisión / regla nueva (skill §16):** un cambio de diseño que sustituya una función se ofrece como opción o se pregunta antes; «sobrio» es sin adornos, no con menos funciones.
+- **Siguiente paso:** los ajustes que pida Javier; luego, volver al núcleo (P2 en Flink, P3/P4, falsos positivos).
+- **Archivos tocados:** `frontend/` (`src/paginas/mapa/` restaurada, `src/api/mapa.ts`, `src/paginas/ataque/{carriles,PaginaAtaque}` y sus tests, `src/paginas/conciencia/PanelConexiones.tsx`, `e2e/mapa.spec.ts`, `README.md`, `docs/plan-mejora.md`, `vite.config.ts`), `.claude/skills/cybersecurity-dashboard/SKILL.md`, `docs/ROADMAP.md`, `BITACORA.md`.
