@@ -857,7 +857,16 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - Playwright recorrió las 17 rutas en los dos temas, maqueta 3D (WebGL) y modo presentación incluidos: sin violaciones de la CSP, errores de consola ni respuestas ≥ 400.
 - **Archivos tocados:** `frontend/{Dockerfile,Caddyfile,.dockerignore,scripts/csp-caddy.mjs,README.md}`, `infra/docker-compose.yml`, `README.md` (tabla de perfiles), `BITACORA.md`.
 
-### 2026-10-24 (3) — Globo del mapa mundial: países iluminados, giro y flechas
+### 2026-10-24 (3) — Mapa mundial en 2D o 3D: el globo en `/mapa`
+- **Con qué/quién:** agente de IA en una sesión remota, por indicación de Javier («no veo el diseño de la tierra en 3D en el frontend, añádelo y ponlo en el main»). Commit y push a `main`, solo a nombre de Javier.
+- **Hecho:**
+  - **Botón «2D | 3D»** en el explorador del mapa mundial (`/mapa?vista=`, recordado en el navegador). El 2D (el mapa de siempre) sigue por defecto; el 3D es un **globo** (`GloboMundial.tsx`, three.js en carga diferida) con **el mismo flujo**: mismos filtros, mismo reloj (pausa y velocidad valen igual) y misma selección. Arcos por el círculo máximo del color de su severidad, el punto con estela del origen al destino, el anillo al llegar y, al elegir una alerta (en el arco o en la tabla), el arco resaltado y sus dos ciudades rotuladas. Sin WebGL no se ofrece; con movimiento reducido, rutas estáticas con su flecha.
+  - La Tierra de los globos (mares y tierras del tema, costas, fronteras, retícula y atmósfera) pasa a `componentes/tierra/`, compartida por el globo de `/mapa` y el de «Mundo» en `/conciencia`, con la geometría de la esfera como funciones puras (`esfera.ts`).
+- **Verificación:** 467 tests unitarios, ESLint y build limpios; Playwright 83 pruebas en tres anchos (4 se saltan a propósito), con una nueva del globo (mismo flujo, selección desde la tabla, vista recordada) y capturas en los dos temas.
+- **Siguiente paso:** lo que pida Javier sobre el portal; luego, volver al núcleo (P2 en Flink, P3/P4, falsos positivos).
+- **Archivos tocados:** `frontend/src/paginas/mapa/` (`GloboMundial.tsx`, `PaginaMapaMundial.tsx` y su test, `mapa.css`), `frontend/src/componentes/tierra/` (nuevo, con `mapamundi.json` movido desde `paginas/conciencia/globo/`), `frontend/src/paginas/conciencia/{Globo3D.tsx,globo.ts,MapaMundi2D.tsx}`, `frontend/scripts/generar-mapamundi.mjs`, `frontend/e2e/mapa.spec.ts`, `frontend/README.md`, `.claude/skills/cybersecurity-dashboard/SKILL.md`, `BITACORA.md`.
+
+### 2026-10-24 (4) — Globo del mapa mundial: países iluminados y flechas, sin giro automático
 - **Con qué/quién:** Claude Code, a petición de Javier, tras traer a local su commit `964a9b0` (mapa mundial en 2D o 3D) por avance rápido.
 - **Hecho (globo de `/mapa`):**
   - Al elegir una alerta se **iluminan sus países** de origen y destino, como en el 2D. Usa los mismos polígonos de Natural Earth, pintados en una capa transparente sobre la Tierra.
@@ -877,3 +886,20 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - Recorrido del globo en los dos temas sin errores: alerta elegida con los países iluminados, flechas y filtro por Japón, Singapur y Brasil; con la demo en pausa, dos capturas separadas 4 s son idénticas (no se mueve solo).
   - Contenedor reconstruido en `localhost:8090`, sin violaciones de la CSP.
 - **Archivos tocados:** `frontend/src/paginas/mapa/{GloboMundial.tsx,PaginaMapaMundial.tsx,vistaGlobo.ts,vistaGlobo.test.ts,mapa.css}`, `frontend/e2e/mapa.spec.ts`, `frontend/README.md`, `frontend/Dockerfile`, `infra/docker-compose.yml`, `README.md`, skill del portal, `BITACORA.md`.
+
+### 2026-10-24 (5) — Un solo mapa 2D del mundo en el portal
+- **Con qué/quién:** Claude Code, a petición de Javier: que el mapa 2D de «Mundo» en Conciencia situacional sea el mismo que el de `/mapa`.
+- **Antes:** los dos mapas compartían la proyección (Natural Earth), pero dibujaban otra cartografía:
+  - Conciencia situacional: continentes de una pieza con fronteras sueltas (`mapamundi.json`), los colores del globo (`--globo-*`) y un encuadre de 1000 × 520.
+  - `/mapa`: los 177 países como polígonos (`tierra.json`), sus propios colores y un encuadre de 1000 × 540.
+- **Hecho:**
+  - El fondo de `/mapa` (proyección, océano, retícula y países) pasa a un componente compartido, `paginas/mapa/FondoMundo.tsx`, que usan los dos mapas.
+  - La proyección y el trazado de líneas salen de `paginas/mapa/geografia.ts`.
+  - Encima, «Mundo» conserva sus capas propias: pasos del ataque, sede y sitios de fuera.
+  - La cartografía queda en un trozo compartido que solo se descarga al abrir uno de los dos mapas. La página de Conciencia situacional no lo carga hasta elegir «Mundo». `mapamundi.json` queda solo para los globos 3D.
+- **Verificación:**
+  - 473 tests unitarios, tsc, ESLint y build limpios.
+  - Playwright: 31 pruebas en tres anchos de mapa, «Mundo», peso de la portada, consola y desbordes (2 saltos previstos).
+  - Capturas antes y después de «Mundo» en los dos temas, comparadas con `/mapa`.
+- **Otro:** el push del 24-10 a `tfg-memoria` fue rechazado porque el remoto tenía la entrada de la sesión remota sobre el globo, también numerada «(3)». Fusión preparada sin commit, con las dos entradas en orden: la del globo en `/mapa` queda como (3) y la de países iluminados pasa a (4). El commit y el push los hace Javier.
+- **Archivos tocados:** `frontend/src/paginas/mapa/{FondoMundo.tsx,LienzoMundial.tsx,geografia.ts}`, `frontend/src/paginas/conciencia/MapaMundi2D.tsx`, `frontend/scripts/generar-mapamundi.mjs`, `frontend/README.md`, skill del portal, `BITACORA.md`.
