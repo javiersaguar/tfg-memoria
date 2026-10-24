@@ -903,3 +903,32 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - Capturas antes y después de «Mundo» en los dos temas, comparadas con `/mapa`.
 - **Otro:** el push del 24-10 a `tfg-memoria` fue rechazado porque el remoto tenía la entrada de la sesión remota sobre el globo, también numerada «(3)». Fusión preparada sin commit, con las dos entradas en orden: la del globo en `/mapa` queda como (3) y la de países iluminados pasa a (4). El commit y el push los hace Javier.
 - **Archivos tocados:** `frontend/src/paginas/mapa/{FondoMundo.tsx,LienzoMundial.tsx,geografia.ts}`, `frontend/src/paginas/conciencia/MapaMundi2D.tsx`, `frontend/scripts/generar-mapamundi.mjs`, `frontend/README.md`, skill del portal, `BITACORA.md`.
+
+### 2026-10-24 (6) — Los globos giran solos, encuadran lo elegido y se iluminan igual en todas partes
+- **Con qué/quién:** Claude Code, a petición de Javier. Corrige lo de la entrada (4): allí se había entendido «sin giro». Lo que Javier quería era:
+  - giro en todo momento;
+  - parar y encuadrar la traza cuando se elige una;
+  - con un país filtrado, centrarse en él y recolocarse solo cuando llegue una traza media, alta o crítica.
+  - Además, la vista «Mundo» de Conciencia situacional debía verse igual de iluminada en todas partes, como la de `/mapa`: en su captura, en tema oscuro, media esfera salía negra.
+- **Hecho:**
+  - `componentes/tierra/camara.ts` (puro, con 7 tests), compartido por los dos globos:
+    - `debeGirar`: gira salvo con algo que mirar, con movimiento reducido, durante un encuadre o mientras se toca. Tras soltarlo, 4 s y retoma.
+    - `encuadrarTraza`: mira desde encima del punto medio del círculo máximo, ladeado 18° al norte para ver la curva, a la distancia justa para que quepan origen y destino.
+  - Globo de `/mapa`:
+    - gira por defecto;
+    - con una traza elegida, la encuadra y se para;
+    - con un país filtrado, se centra en él y solo se recoloca con una traza **nueva** de nivel medio, alto o crítico (`trazaQueRecoloca`, con tests);
+    - `data-modo` para las pruebas.
+  - Globo de «Mundo»: gira siempre y retoma tras moverlo a mano. Se quitó su botón de giro opcional.
+  - **Iluminación** (`componentes/tierra/IluminacionGlobo.tsx`): luz ambiental blanca y luz principal que acompaña a la cámara, en lugar de la luz de cielo y suelo. Esa luz usaba como «suelo» el color de fondo del tema, casi negro en oscuro, y dejaba el hemisferio sur a oscuras. Revisado en los dos temas.
+- **Verificación:**
+  - 481 tests unitarios, tsc, ESLint y build limpios.
+  - Playwright: 26 escenarios de mapa, «Mundo», consola, peso y movimiento en tres anchos (4 saltos previstos). El e2e del globo comprueba ahora el modo de cámara en cada paso.
+  - Recorrido en el navegador:
+    - gira sin nada elegido;
+    - quieto y encuadrado con una traza;
+    - vuelve a girar al cerrarla;
+    - centrado en Japón;
+    - recolocado al llegar París → Tokio (medio);
+    - retoma tras arrastrar.
+- **Archivos tocados:** `frontend/src/componentes/tierra/{camara.ts,camara.test.ts,IluminacionGlobo.tsx}`, `frontend/src/paginas/mapa/{GloboMundial.tsx,PaginaMapaMundial.tsx,vistaGlobo.ts,vistaGlobo.test.ts}`, `frontend/src/paginas/conciencia/Globo3D.tsx`, `frontend/e2e/mapa.spec.ts`, `frontend/README.md`, skill del portal, `BITACORA.md`.
