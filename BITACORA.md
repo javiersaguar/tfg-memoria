@@ -861,7 +861,7 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Con qué/quién:** Claude Code, a petición de Javier, tras traer a local su commit `964a9b0` (mapa mundial en 2D o 3D) por avance rápido.
 - **Hecho (globo de `/mapa`):**
   - Al elegir una alerta se **iluminan sus países** de origen y destino, como en el 2D. Usa los mismos polígonos de Natural Earth, pintados en una capa transparente sobre la Tierra.
-  - **Giro automático** mientras se mira el mundo entero. Se para al elegir una alerta o filtrar por país, y desde ahí solo se mueve a mano. Vuelve a girar al quitar las dos cosas.
+  - **Sin giro automático.** Primero se hizo un giro que se paraba al elegir una alerta o filtrar por país; Javier, tras verlo, decidió que el globo **no gire solo en ningún momento**. Se quitaron el giro y su botón: solo se mueve a mano (arrastre o flechas). Anotado en la skill para que no se reintroduzca.
   - Si lo elegido queda a espaldas, la vista se vuelve una vez hacia ello; si ya se ve, no se mueve.
   - **Flechas** en la esquina inferior derecha: 20° por pulsación y tope de 75° de latitud.
   - La luz principal acompaña a la cámara, para que la cara visible no quede en sombra al girar.
@@ -874,6 +874,6 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Verificación:**
   - 473 tests unitarios, tsc, ESLint y build limpios.
   - Playwright `mapa.spec.ts`: 15/15 en tres anchos.
-  - Recorrido del globo en los dos temas sin errores: alerta elegida con los países iluminados, flechas, giro que se para y se reanuda, y filtro por Japón, Singapur y Brasil.
+  - Recorrido del globo en los dos temas sin errores: alerta elegida con los países iluminados, flechas y filtro por Japón, Singapur y Brasil; con la demo en pausa, dos capturas separadas 4 s son idénticas (no se mueve solo).
   - Contenedor reconstruido en `localhost:8090`, sin violaciones de la CSP.
 - **Archivos tocados:** `frontend/src/paginas/mapa/{GloboMundial.tsx,PaginaMapaMundial.tsx,vistaGlobo.ts,vistaGlobo.test.ts,mapa.css}`, `frontend/e2e/mapa.spec.ts`, `frontend/README.md`, `frontend/Dockerfile`, `infra/docker-compose.yml`, `README.md`, skill del portal, `BITACORA.md`.
