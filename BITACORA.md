@@ -847,7 +847,7 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
     - cabeceras de seguridad, y el bloque `/api` comentado para cuando exista F6.3.
   - CSP sin `unsafe-inline` para scripts: `scripts/csp-caddy.mjs` calcula en cada compilación la huella SHA-256 del script del tema que va en línea en `index.html`. Estilos con `unsafe-inline`, porque Radix y React Flow los insertan en tiempo de ejecución.
   - Servicio `portal` en `infra/docker-compose.yml`, con perfil propio `portal`:
-    - publicado en `127.0.0.1:4173`;
+    - publicado en `127.0.0.1:8090`, no en el 4173: Playwright arranca `vite preview` en ese puerto y reutiliza lo que encuentre, así que con el contenedor ahí probaba la imagen y no el build nuevo;
     - usuario 10001, raíz de solo lectura con tmpfs para `/data` y `/config`, `cap_drop: [ALL]` y `no-new-privileges`;
     - al binario de Caddy se le quita la capacidad de abrir puertos bajos, porque escucha en el 8080.
 - **Decisiones:** imagen de producción, no de desarrollo: para trabajar sigue `npm run dev`. Caddy en vez de nginx, por ser el mismo servidor que ya se usaba en PIDS y por su configuración más corta. La imagen no lee nada fuera de `frontend/`: los datos van en `src/api/datos/`, así que tras `npm run sincronizar-datos` hay que reconstruirla.
@@ -856,3 +856,24 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - Cabeceras, 404 de `/assets`, caché y compresión comprobados con `curl`.
   - Playwright recorrió las 17 rutas en los dos temas, maqueta 3D (WebGL) y modo presentación incluidos: sin violaciones de la CSP, errores de consola ni respuestas ≥ 400.
 - **Archivos tocados:** `frontend/{Dockerfile,Caddyfile,.dockerignore,scripts/csp-caddy.mjs,README.md}`, `infra/docker-compose.yml`, `README.md` (tabla de perfiles), `BITACORA.md`.
+
+### 2026-10-24 (3) — Globo del mapa mundial: países iluminados, giro y flechas
+- **Con qué/quién:** Claude Code, a petición de Javier, tras traer a local su commit `964a9b0` (mapa mundial en 2D o 3D) por avance rápido.
+- **Hecho (globo de `/mapa`):**
+  - Al elegir una alerta se **iluminan sus países** de origen y destino, como en el 2D. Usa los mismos polígonos de Natural Earth, pintados en una capa transparente sobre la Tierra.
+  - **Giro automático** mientras se mira el mundo entero. Se para al elegir una alerta o filtrar por país, y desde ahí solo se mueve a mano. Vuelve a girar al quitar las dos cosas.
+  - Si lo elegido queda a espaldas, la vista se vuelve una vez hacia ello; si ya se ve, no se mueve.
+  - **Flechas** en la esquina inferior derecha: 20° por pulsación y tope de 75° de latitud.
+  - La luz principal acompaña a la cámara, para que la cara visible no quede en sombra al girar.
+  - El resumen accesible del globo dice qué países se iluminan.
+  - Lógica pura en `paginas/mapa/vistaGlobo.ts`, con 6 tests.
+- **Problemas encontrados:**
+  - El portal en Docker usaba el puerto 4173, el mismo que Playwright usa para `vite preview` con `reuseExistingServer`: el e2e probaba la imagen y no el build nuevo. El portal pasa al **8090**.
+  - Playwright reduce el movimiento por defecto, así que el test del giro tiene que activarlo explícitamente.
+  - La máquina iba más lenta de lo normal: la batería unitaria tardaba 60 s y fallaba por *timeouts* también sin estos cambios, comprobado en un worktree de `HEAD`. Con `--maxWorkers=4 --testTimeout=30000` pasa entera.
+- **Verificación:**
+  - 473 tests unitarios, tsc, ESLint y build limpios.
+  - Playwright `mapa.spec.ts`: 15/15 en tres anchos.
+  - Recorrido del globo en los dos temas sin errores: alerta elegida con los países iluminados, flechas, giro que se para y se reanuda, y filtro por Japón, Singapur y Brasil.
+  - Contenedor reconstruido en `localhost:8090`, sin violaciones de la CSP.
+- **Archivos tocados:** `frontend/src/paginas/mapa/{GloboMundial.tsx,PaginaMapaMundial.tsx,vistaGlobo.ts,vistaGlobo.test.ts,mapa.css}`, `frontend/e2e/mapa.spec.ts`, `frontend/README.md`, `frontend/Dockerfile`, `infra/docker-compose.yml`, `README.md`, skill del portal, `BITACORA.md`.
