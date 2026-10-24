@@ -856,3 +856,12 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - Cabeceras, 404 de `/assets`, caché y compresión comprobados con `curl`.
   - Playwright recorrió las 17 rutas en los dos temas, maqueta 3D (WebGL) y modo presentación incluidos: sin violaciones de la CSP, errores de consola ni respuestas ≥ 400.
 - **Archivos tocados:** `frontend/{Dockerfile,Caddyfile,.dockerignore,scripts/csp-caddy.mjs,README.md}`, `infra/docker-compose.yml`, `README.md` (tabla de perfiles), `BITACORA.md`.
+
+### 2026-10-24 (3) — Mapa mundial en 2D o 3D: el globo en `/mapa`
+- **Con qué/quién:** agente de IA en una sesión remota, por indicación de Javier («no veo el diseño de la tierra en 3D en el frontend, añádelo y ponlo en el main»). Commit y push a `main`, solo a nombre de Javier.
+- **Hecho:**
+  - **Botón «2D | 3D»** en el explorador del mapa mundial (`/mapa?vista=`, recordado en el navegador). El 2D (el mapa de siempre) sigue por defecto; el 3D es un **globo** (`GloboMundial.tsx`, three.js en carga diferida) con **el mismo flujo**: mismos filtros, mismo reloj (pausa y velocidad valen igual) y misma selección. Arcos por el círculo máximo del color de su severidad, el punto con estela del origen al destino, el anillo al llegar y, al elegir una alerta (en el arco o en la tabla), el arco resaltado y sus dos ciudades rotuladas. Sin WebGL no se ofrece; con movimiento reducido, rutas estáticas con su flecha.
+  - La Tierra de los globos (mares y tierras del tema, costas, fronteras, retícula y atmósfera) pasa a `componentes/tierra/`, compartida por el globo de `/mapa` y el de «Mundo» en `/conciencia`, con la geometría de la esfera como funciones puras (`esfera.ts`).
+- **Verificación:** 467 tests unitarios, ESLint y build limpios; Playwright 83 pruebas en tres anchos (4 se saltan a propósito), con una nueva del globo (mismo flujo, selección desde la tabla, vista recordada) y capturas en los dos temas.
+- **Siguiente paso:** lo que pida Javier sobre el portal; luego, volver al núcleo (P2 en Flink, P3/P4, falsos positivos).
+- **Archivos tocados:** `frontend/src/paginas/mapa/` (`GloboMundial.tsx`, `PaginaMapaMundial.tsx` y su test, `mapa.css`), `frontend/src/componentes/tierra/` (nuevo, con `mapamundi.json` movido desde `paginas/conciencia/globo/`), `frontend/src/paginas/conciencia/{Globo3D.tsx,globo.ts,MapaMundi2D.tsx}`, `frontend/scripts/generar-mapamundi.mjs`, `frontend/e2e/mapa.spec.ts`, `frontend/README.md`, `.claude/skills/cybersecurity-dashboard/SKILL.md`, `BITACORA.md`.
