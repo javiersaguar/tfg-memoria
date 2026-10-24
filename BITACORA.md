@@ -835,3 +835,24 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Decisión / regla nueva (skill §16):** un cambio de diseño que sustituya una función se ofrece como opción o se pregunta antes; «sobrio» es sin adornos, no con menos funciones.
 - **Siguiente paso:** los ajustes que pida Javier; luego, volver al núcleo (P2 en Flink, P3/P4, falsos positivos).
 - **Archivos tocados:** `frontend/` (`src/paginas/mapa/` restaurada, `src/api/mapa.ts`, `src/paginas/ataque/{carriles,PaginaAtaque}` y sus tests, `src/paginas/conciencia/PanelConexiones.tsx`, `e2e/mapa.spec.ts`, `README.md`, `docs/plan-mejora.md`, `vite.config.ts`), `.claude/skills/cybersecurity-dashboard/SKILL.md`, `docs/ROADMAP.md`, `BITACORA.md`.
+
+### 2026-10-24 (2) — El portal, en Docker
+- **Con qué/quién:** Claude Code, a petición de Javier («vamos a dockerizar el frontend»). Antes, Javier pidió parar el stack de PIDS: `docker compose -p pids stop`, sin borrar contenedores ni volúmenes. Con él parado, la batería de Vitest pasa entera (466) con `--maxWorkers=8`; con los procesos por defecto (23 en 24 núcleos) aún salen 3 *timeouts*.
+- **Hecho:**
+  - `frontend/Dockerfile` en dos etapas: compila con `node:22.23.2-alpine` (`npm ci` + `npm run build`) y sirve con `caddy:2.10.2-alpine`. La imagen final no lleva Node ni `node_modules`.
+  - `frontend/Caddyfile`:
+    - las rutas de la SPA vuelven a `index.html`, y un `/assets` que no existe da 404;
+    - caché de un año para `/assets` (llevan huella en el nombre) y `no-cache` para `index.html`;
+    - compresión zstd/gzip;
+    - cabeceras de seguridad, y el bloque `/api` comentado para cuando exista F6.3.
+  - CSP sin `unsafe-inline` para scripts: `scripts/csp-caddy.mjs` calcula en cada compilación la huella SHA-256 del script del tema que va en línea en `index.html`. Estilos con `unsafe-inline`, porque Radix y React Flow los insertan en tiempo de ejecución.
+  - Servicio `portal` en `infra/docker-compose.yml`, con perfil propio `portal`:
+    - publicado en `127.0.0.1:4173`;
+    - usuario 10001, raíz de solo lectura con tmpfs para `/data` y `/config`, `cap_drop: [ALL]` y `no-new-privileges`;
+    - al binario de Caddy se le quita la capacidad de abrir puertos bajos, porque escucha en el 8080.
+- **Decisiones:** imagen de producción, no de desarrollo: para trabajar sigue `npm run dev`. Caddy en vez de nginx, por ser el mismo servidor que ya se usaba en PIDS y por su configuración más corta. La imagen no lee nada fuera de `frontend/`: los datos van en `src/api/datos/`, así que tras `npm run sincronizar-datos` hay que reconstruirla.
+- **Verificación:**
+  - Imagen construida y contenedor `healthy`.
+  - Cabeceras, 404 de `/assets`, caché y compresión comprobados con `curl`.
+  - Playwright recorrió las 17 rutas en los dos temas, maqueta 3D (WebGL) y modo presentación incluidos: sin violaciones de la CSP, errores de consola ni respuestas ≥ 400.
+- **Archivos tocados:** `frontend/{Dockerfile,Caddyfile,.dockerignore,scripts/csp-caddy.mjs,README.md}`, `infra/docker-compose.yml`, `README.md` (tabla de perfiles), `BITACORA.md`.
