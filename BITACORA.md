@@ -1002,3 +1002,19 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - que el portal no pueda borrar la red del proyecto;
   - normalizar las grafías de usuario (`pbeesly` y `DMEVALS\pbeesly`).
 - **Archivos tocados:** `infra/flink/jobs/{p2_comun,p2_01_aristas,p2_02_flujo,p2_03_campanas}.sql`, `detection/patterns/p2_lateral_movement.sql` (comentarios), `docs/ROADMAP.md`, `BITACORA.md`.
+
+### 2026-10-26 (2) — Planificación: orden del resto de F3 y dos ideas nuevas
+- **Orden acordado para cerrar F3:**
+  1. emitir las campañas a `det.campaigns` con un esquema común P1/P2 (`stages[]`);
+  2. revalidar P1 y P2 en streaming;
+  3. P3 (descubrimiento y escalada);
+  4. falsos positivos sobre la porción benigna.
+  Con eso se cumple el DoD de F3: ≥3 patrones y los falsos positivos cuantificados.
+- **Idea 1 (Javier): ampliar la detección** a más ataques, a Linux y a datos propios. Se incorpora al ROADMAP como **fase FA, condicionada**: solo tras el punto de control del 28-02-2027, y es lo primero que se recorta (riesgo nuevo R14).
+  - Orden por coste: Zeek, que ya viene en el dataset → day2 → Linux (auditd, Sysmon for Linux, journald) → más familias de ataque → simulaciones propias en laboratorio aislado.
+  - **Valor para la memoria:** demuestra que la arquitectura generaliza. Una fuente nueva solo pide un mapeador OCSF y reglas.
+- **Idea 2 (Javier): honeypots para las organizaciones.** Queda como **línea futura del producto** (ROADMAP §3.4), fuera del alcance del TFG. Matices:
+  - empezar por *honeytokens* en la red real: casi cero falsos positivos, y una credencial señuelo usada tras un volcado de LSASS refuerza P1;
+  - un honeypot expuesto muestra atacantes oportunistas, no cómo atacarían esa organización. Eso lo da el análisis de rutas de F5;
+  - los de alta interacción tienen riesgo real y aspectos legales.
+- **Archivos tocados:** `docs/ROADMAP.md` (tabla de fases, §3.4, fase FA, R14), `BITACORA.md`.
