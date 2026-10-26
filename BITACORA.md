@@ -962,3 +962,43 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - Las 17 aristas del salto salen con las mismas horas, al milisegundo.
 - **Preparado, sin ejecutar:** `p2_01_aristas.sql`, con el mapa IP → host derivado de las conexiones salientes, el controlador de dominio por comportamiento y las aristas con confirmación bilateral, cada pieza con su comprobación contra el oráculo.
 - **Archivos tocados:** `scripts/load_f3_corpus.sh`, `infra/flink/jobs/p2_00_tabla.sql`, `infra/flink/jobs/p2_01_aristas.sql`, `BITACORA.md`.
+
+### 2026-10-26 — P2 en Flink: la campaña de movimiento lateral, exacta
+- **Con qué/quién:** Claude Code, sesión guiada, con los comandos ejecutados por Javier. Continúa la del 25-10.
+- **Objetivo:** terminar de portar P2 a `MATCH_RECOGNIZE` y reproducir el oráculo `tfg.p2_campanas`.
+- **Paso 1, aristas** (`p2_01_aristas.sql`). En la primera pasada había una entrada de más en el mapa IP → host: `0:0:0:0:0:0:0:1` atribuida a NEWYORK con 41 votos.
+  - Es el loopback IPv6 sin abreviar, como lo escribe Sysmon. El filtro solo buscaba `::1`.
+  - Fabricaba 2 aristas falsas SCRANTON → NEWYORK:5985, que eran WinRM local de SCRANTON y NEWYORK no confirmaba nunca.
+  - El oráculo no lo sufre porque ClickHouse interpreta la IP (`toIPv6`) y las dos grafías son el mismo valor. En Flink se comparan como texto.
+  - Corregido normalizando la grafía y descartando también el loopback como destino. Después cuadra todo:
+    - el mapa (SCRANTON 126, NASHUA 408, NEWYORK 80, UTICA 16);
+    - NEWYORK como controlador;
+    - 39 aristas: 22 al controlador y 17 SCRANTON → NASHUA.
+  - **Dato nuevo:** las 17 aristas están confirmadas desde los dos extremos.
+- **Un topic intermedio, `det.p2_flujo`.** `MATCH_RECOGNIZE` ordena por un atributo de tiempo, y Flink lo pierde al pasar por las agregaciones y joins que construyen las aristas.
+  - `p2_02_flujo.sql` publica en ese topic, por host de destino, las aristas y la evidencia de ejecución (T1021.*, T1569.002, T1003.*) deduplicada por `alert_id`.
+  - El patrón lo relee con su marca de agua.
+  - Es también la arquitectura de producción: un job de enriquecimiento y otro de CEP, desacoplados por el bus. Deja el patrón listo para streaming.
+  - Comprobado: 17 aristas, y las evidencias de los nueve datasets coinciden con ClickHouse, sin duplicados.
+  - Las tablas y vistas comunes pasan a `p2_comun.sql`, cargado con `sql-client -i`, para que una corrección llegue a todos los pasos.
+- **Paso 3, patrón y campañas** (`p2_03_campanas.sql`). Dos niveles, como P1:
+  - **Nivel 1:** `MATCH_RECOGNIZE` con `PATTERN (X Y)` por destino: una arista y una evidencia consecutivas a ≤ 300 s, en cualquier orden.
+  - **Nivel 2:** campañas por hueco ≤ 300 s entre aristas del mismo par. Cada campaña exige al menos una transición: equivale al `HAVING evidencia_p2 >= 1` del oráculo.
+- **Resultado: idéntico al oráculo campo a campo.**
+  - `campaign_id` `07c1426c…edfdc`.
+  - 03:09:23.801 → 03:17:59.493, 516 s.
+  - 17 aristas en 135/445/5985, bilateral.
+  - 115 absorbidas, 8 evidencias (4/4/1), confianza 1,0.
+  - Nuevo: 13 transiciones (6 empiezan por la arista y 7 por la evidencia) y **7 de 8 evidencias detrás de su conexión, con un retraso máximo de 1.004 ms**. La octava es la de resolución de segundo.
+- **Matiz para la memoria:** tres de las transiciones que empiezan por la evidencia (63, 74 y 197 s) emparejan una tanda de PsExec con la conexión de la tanda siguiente.
+  - No estorban: el nivel 1 solo decide si hay campaña.
+  - Por eso la señal de orden fiable es la medida **por evidencia**, no el recuento de transiciones.
+  - Acortar la ventana de proximidad las quitaría, porque la evidencia llega en menos de 2 s. A cambio, se dejaría de reproducir el oráculo.
+- **Cabecera del oráculo puesta al día:** el orden conexión → ejecución con la hora del evento; `tfg.events` ya es ReplacingMergeTree; el usuario del EID 3 ya se mapea; PSEXESVC llega a 56 ms y no a 55 s. Solo cambian comentarios, la vista no se toca.
+- **Pendiente:**
+  - emitir las campañas de P2 a `det.campaigns` con el esquema común de campaña, que P1 tampoco tiene (`stages[]`);
+  - recrear `det.campaigns`, que también caducó;
+  - revalidar P1 y P2 en streaming;
+  - que el portal no pueda borrar la red del proyecto;
+  - normalizar las grafías de usuario (`pbeesly` y `DMEVALS\pbeesly`).
+- **Archivos tocados:** `infra/flink/jobs/{p2_comun,p2_01_aristas,p2_02_flujo,p2_03_campanas}.sql`, `detection/patterns/p2_lateral_movement.sql` (comentarios), `docs/ROADMAP.md`, `BITACORA.md`.
