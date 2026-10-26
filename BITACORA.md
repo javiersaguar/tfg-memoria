@@ -1087,3 +1087,31 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - el enriquecimiento de P2 (mapa IP → host) en continuo, como tabla de consulta.
 - **Siguiente paso:** P3 (descubrimiento y escalada), el tercero del orden acordado.
 - **Archivos tocados:** `infra/flink/jobs/{st_00_desorden,st_01_p1,st_02_p2,p1_06_flujo,p2_02_flujo}.sql`, `docs/ROADMAP.md`, `BITACORA.md`.
+
+### 2026-10-26 (5) — P3, descubrimiento y escalada: inventario, decisiones y versión batch
+- **Con qué/quién:** Claude Code, sesión guiada, con los comandos ejecutados por Javier. Es el tercer paso del orden acordado para cerrar F3.
+- **Inventario antes de diseñar** (`p3_00_inventario.sql`, `p3_01_detalle.sql`):
+  - **Sigma no ve el descubrimiento del atacante en apt29.** Hay 2 alertas de `discovery` en todo el día, y son del agente de Azure. El descubrimiento está en PowerShell: `get-process` (03:01), `Invoke-Discovery` (03:04:03, paso 4.C) e `Invoke-Command -ComputerName NASHUA { Get-Process }` (03:09:23).
+  - **Las 322 alertas de persistencia de SCRANTON:** 292 son `Potential Binary Or Script Dropper Via PowerShell`, sin técnica asignada (la regla dominante del día). La persistencia real es la carpeta de inicio (03:04:23, paso 5.B).
+  - **Ruido identificado, con prueba:**
+    - la ráfaga de `route`/`ipconfig`/`arp` y los `sc.exe config RdAgent` de 03:19-03:22 son de los agentes de Azure (`WindowsAzureGuestAgent`, `WaAppAgent`…);
+    - `Internet Explorer Autorun Keys Modification` la escribe `Explorer.EXE` al iniciar sesión (28-64 s tras empezar cada captura LSASS);
+    - NEWYORK ejecuta cada 15 min un script de monitorización con `Get-ADDomain`.
+    - Es un buen ejemplo para la memoria: el software legítimo hace el mismo reconocimiento que un atacante.
+  - **Las capturas LSASS traen reconocimiento** (`whoami`, `systeminfo`, cuentas locales) en las 7, pero **escalada real** (`getsystem`, T1134) solo en 2.
+  - Los eventos 4672 («privilegios especiales») no sirven de etapa: están en todos los hosts, casi siempre con `SeDebugPrivilege` (125 en NEWYORK).
+- **Decisiones (Javier):**
+  - **la escalada es el ancla**, acompañada de descubrimiento o persistencia en el mismo host;
+  - **descubrimiento híbrido**: alertas más bloques de PowerShell con cmdlets de descubrimiento. Con esto se cierra la «decisión abierta» de F3.2 desde el 31-07;
+  - **lista de exclusiones medida**.
+  - Además, como en P1 y P2: **etapas por técnica, no por táctica**; el orden se mide y no se exige; ventana de 10 min.
+- **Resultado** (`p3_discovery_escalation.sql`: vistas `tfg.p3_evidencia` y `tfg.p3_campanas`): **3 campañas.**
+  - **apt29 SCRANTON**, de 02:58:30 a 03:09:29, con el orden **escalada → descubrimiento → persistencia**: exactamente el del plan (3.B → 4.x → 5.B), y visible gracias a PowerShell. Confianza 0,90.
+  - **LSASS_01 y LSASS_03** (`getsystem`), con el orden descubrimiento → escalada. Confianza 0,75.
+  - **Lo que la secuencia deja fuera** es la tesis del CEP: NEWYORK (25 evidencias de descubrimiento, todas de monitorización) y LSASS_02/04-07 (26-64 de reconocimiento) no forman campaña porque no hay escalada.
+- **Lista de exclusiones, medida:** A1 (Explorer al iniciar sesión) quita 28 evidencias, 4 en cada uno de 7 datasets. Hubo una A2 para los agentes de Azure y **se quitó, porque no quitaba nada**: lo que lanza Azure nunca llega a ser evidencia de P3. Una exclusión sin efecto es ajuste especulativo.
+- **Dudas para el paso de falsos positivos:**
+  - 16 alertas de persistencia de `spoolsv.exe` a las 03:19:48, probablemente benignas; quedan fuera de la ventana;
+  - la «inyección» T1055.011 de las 03:06:08 (`csrss.exe`/`explorer.exe`) alarga el ancla de SCRANTON y coincide con el registro de pulsaciones del atacante, pero no está demostrada.
+- **Siguiente paso:** P3 en Flink (flujo, patrón, emisión al esquema común y streaming), con la misma estructura que P1 y P2. Después, los falsos positivos.
+- **Archivos tocados:** `detection/patterns/{p3_00_inventario,p3_01_detalle,p3_discovery_escalation,p3_02_comprobar}.sql`, `docs/scenarios/apt29-day1.md`, `docs/ROADMAP.md`, `BITACORA.md`.
