@@ -1115,3 +1115,25 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - la «inyección» T1055.011 de las 03:06:08 (`csrss.exe`/`explorer.exe`) alarga el ancla de SCRANTON y coincide con el registro de pulsaciones del atacante, pero no está demostrada.
 - **Siguiente paso:** P3 en Flink (flujo, patrón, emisión al esquema común y streaming), con la misma estructura que P1 y P2. Después, los falsos positivos.
 - **Archivos tocados:** `detection/patterns/{p3_00_inventario,p3_01_detalle,p3_discovery_escalation,p3_02_comprobar}.sql`, `docs/scenarios/apt29-day1.md`, `docs/ROADMAP.md`, `BITACORA.md`.
+
+### 2026-10-26 (6) — P3 en Flink: evidencia híbrida, campañas, streaming y emisión
+- **Con qué/quién:** Claude Code, sesión guiada, con los comandos ejecutados por Javier. El agente hizo además dos consultas de solo lectura: el registro de Flink, para el diagnóstico, y el recuento de la evidencia antes de escribir el topic.
+- **Hecho:** P3 con la misma estructura que P1 y P2 (`infra/flink/jobs/p3_comun.sql`, `p3_01_flujo`, `p3_02_campanas`, `p3_03_emision`, `st_03_p3`).
+  - Es el **primer patrón que mezcla alertas y eventos en una misma etapa**: el descubrimiento sale de las alertas Sigma y de los bloques de PowerShell de `norm.events`.
+  - Las etapas se definen por técnica, con `REGEXP` sobre la lista de técnicas.
+  - Las palabras clave se buscan con `POSITION` y no con `LIKE`, porque `_` es comodín en `LIKE` y aparece en `win32_operatingsystem`.
+  - La exclusión A1 se aplica al escribir el flujo, que sale en orden de tiempo.
+- **Un tropiezo:** `per` es palabra reservada en Flink SQL, y la carga del fichero común fallaba sin decir dónde. Lo dijo el registro del cliente. Las marcas pasaron a llamarse `m_escalada`, `m_descubrimiento` y `m_persistencia`.
+- **Resultado:**
+  - **Evidencia:** las 19 cifras por dataset, etapa y fuente son idénticas a `tfg.p3_evidencia` y no hay repetidos.
+  - **Campañas:** las **mismas 3** que el oráculo (SCRANTON, LSASS_01 y LSASS_03), con la **misma confianza** (0,90 / 0,75 / 0,75). En SCRANTON, las etapas salen en el orden del plan: escalada → descubrimiento → persistencia.
+  - **Streaming:** la última versión de cada campaña es igual a la de batch.
+  - **Emisión:** 3 hallazgos OCSF válidos. En `related_events` conviven alertas (`alert`) y eventos de PowerShell (`event`). `tfg.campaigns` queda con P1 11, P2 1 y P3 3.
+- **Decisión pendiente: la extensión de la campaña.** Flink la acota a su evidencia, de la primera a la última transición. El oráculo absorbe ±10 min alrededor de las escaladas.
+  - En P1 y P2 apenas cambiaba los recuentos. En P3 sí, porque el descubrimiento es una ráfaga alrededor del ancla: LSASS_01 cuenta 3 alertas y 0 bloques de PowerShell en Flink, frente a 23 y 51 en el oráculo; SCRANTON termina a las 03:06:47 y no a las 03:09:29.
+  - Campañas y confianza coinciden, pero la reducción de alertas depende del contexto absorbido. Hay que decidir la definición antes de medirla en F7.
+- **Estado del DoD de F3:**
+  - cumplidos: ≥3 patrones disparando sobre datos reales (P1, P2, P3); P1 7/7; campañas multi-etapa en apt29;
+  - pendientes: los **falsos positivos** y la **ratio de reducción** de los tres patrones (hoy solo la de P1).
+- **Siguiente paso:** los falsos positivos, el cuarto del orden acordado.
+- **Archivos tocados:** `infra/flink/jobs/{p3_comun,p3_01_flujo,p3_02_campanas,p3_03_emision,st_03_p3}.sql`, `docs/ROADMAP.md`, `BITACORA.md`.
