@@ -1018,3 +1018,41 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - un honeypot expuesto muestra atacantes oportunistas, no cómo atacarían esa organización. Eso lo da el análisis de rutas de F5;
   - los de alta interacción tienen riesgo real y aspectos legales.
 - **Archivos tocados:** `docs/ROADMAP.md` (tabla de fases, §3.4, fase FA, R14), `BITACORA.md`.
+
+### 2026-10-26 (3) — Esquema común de campaña: hallazgos OCSF de P1 y P2 hasta ClickHouse
+- **Con qué/quién:** Claude Code, sesión guiada, con los comandos ejecutados por Javier. Es el primer paso del orden acordado para cerrar F3.
+- **Decisiones (Javier):** una campaña es un hallazgo **OCSF 1.5.0 «Detection Finding»** (clase 2004) con extensión `tfg.*`. Los `stages[]` son **etapas lógicas**, cada una con sus alertas. Se publican en `det.campaigns`, sin caducidad, y se guardan en una tabla **`tfg.campaigns`**. Especificación en `docs/esquema-campana.md`.
+  - Lo estándar va en campos OCSF: `finding_info.related_events` (las alertas), `attacks`, `confidence_score` y `start_time`/`end_time`/`duration`.
+  - Lo propio va en `tfg`:
+    - `stages[]` ordenadas, lo único que OCSF no ofrece;
+    - `confidence_factors`, cuya suma es la confianza;
+    - `devices` con su papel;
+    - las métricas de cada patrón.
+  - `attacks[]` no lleva táctica: las alertas traen técnicas y tácticas sin emparejar, y emparejarlas sería inventar. Las tácticas van en `tfg.tactic_names`.
+  - **Identidad común:** `md5(dataset|patrón|clave|inicio_ms)`. Los identificadores de P2 no cambian.
+- **Orden de las etapas (Javier):** por el segundo de la primera evidencia y, dentro del mismo segundo, por el orden lógico del patrón.
+  - Sin esta regla, la sesión WinRM de las 03:09:23.000, con hora de resolución de segundo, ponía la ejecución remota de P2 antes que la conexión de las 03:09:23.801 que la origina.
+  - La alternativa exacta, llevar `time_source` a las alertas, obligaba a repetir la detección.
+- **Cómo se construye el JSON en Flink.** `JSON_OBJECT` solo anida objetos creados en la misma expresión; los que llegan de una subconsulta los inserta como texto.
+  - Por eso los objetos sin listas se hacen con `JSON_OBJECT`, las listas con `LISTAGG`, y el documento se compone con `CONCAT` (`value.format = raw`).
+  - Los literales de texto van con `CAST(... AS STRING)`, porque en un `CASE` se rellenan con espacios.
+  - Como es frágil por construcción, **el volcado valida cada documento** (`sink_campaigns.py`, 9 tests) y se detiene ante el primero que no cumpla: clase 2004, tiempos coherentes, confianza igual a la suma de sus factores, etapas 1..n con su evidencia y `related_events` sin repetidos.
+- **Hallazgo: P1 en Flink podía fabricar campañas.** Con seis detectores, `det.alerts` trae republicaciones (1.201 para 1.184 distintas), y `p1_05` las leía tal cual.
+  - Una alerta de credenciales aislada publicada dos veces formaría una transición consigo misma y, con ella, una campaña falsa. El 31-07 no ocurría porque había un solo detector.
+  - Se arregla como en P2: `p1_06_flujo.sql` publica en `det.p1_flujo` la evidencia sin repetidos y con sus etapas precalculadas, y el patrón lee de ahí.
+  - `p1_05` queda marcado como sustituido. La lógica del patrón no cambia.
+- **Resultado:**
+  - **P2:** la campaña de siempre, ahora como hallazgo OCSF:
+    - 4 etapas en orden: conexión → ejecución remota → credenciales → servicio;
+    - 5 técnicas, entre ellas T1059.001, que el oráculo no contaba;
+    - gravedad 4.
+  - **P1:** las **mismas 11 campañas que el oráculo**, con evidencias, etapas y confianza **idénticas**.
+    - Por primera vez los recuentos de P1 en Flink son de alertas y no de transiciones, así que se comparan uno a uno con el oráculo.
+    - La extensión sigue acotada a la evidencia, como se decidió el 31-07.
+  - `det.campaigns`: 12 mensajes, 12 JSON válidos. El volcado: `Total insertado: 12  P1: 11  P2: 1`.
+- **Detalles apuntados:**
+  - la segunda campaña de SCRANTON empieza y acaba en el mismo milisegundo (dos accesos a LSASS simultáneos): dura 0 ms;
+  - `users[]` no se emite todavía, porque mezcla grafías;
+  - el contrato del portal (`frontend/src/api/tipos.ts`, `CampanaP1`/`CampanaP2`) sigue con los esquemas viejos y se cambiará cuando exista la API (F6.3).
+- **Siguiente paso:** revalidar P1 y P2 en streaming, el segundo del orden acordado.
+- **Archivos tocados:** `docs/esquema-campana.md`, `infra/clickhouse/init/03_campaigns.sql`, `pipeline/jobs/{sink_campaigns,test_sink_campaigns}.py`, `infra/flink/jobs/{p1_comun,p1_06_flujo,p1_07_campanas,p1_08_emision,p2_comun,p2_03_campanas,p2_04_emision,campanas_comprobar}.sql`, `infra/flink/jobs/p1_05_emision.sql` (marcado como sustituido), `docs/ROADMAP.md`, `BITACORA.md`.
