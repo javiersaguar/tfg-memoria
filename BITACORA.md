@@ -1056,3 +1056,34 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - el contrato del portal (`frontend/src/api/tipos.ts`, `CampanaP1`/`CampanaP2`) sigue con los esquemas viejos y se cambiará cuando exista la API (F6.3).
 - **Siguiente paso:** revalidar P1 y P2 en streaming, el segundo del orden acordado.
 - **Archivos tocados:** `docs/esquema-campana.md`, `infra/clickhouse/init/03_campaigns.sql`, `pipeline/jobs/{sink_campaigns,test_sink_campaigns}.py`, `infra/flink/jobs/{p1_comun,p1_06_flujo,p1_07_campanas,p1_08_emision,p2_comun,p2_03_campanas,p2_04_emision,campanas_comprobar}.sql`, `infra/flink/jobs/p1_05_emision.sql` (marcado como sustituido), `docs/ROADMAP.md`, `BITACORA.md`.
+
+### 2026-10-26 (4) — P1 y P2 en streaming: idénticos a batch, con la entrada en orden de tiempo
+- **Con qué/quién:** Claude Code. Los pasos de medición y preparación los ejecutó Javier. Las consultas finales de comprobación de P2 las ejecutó el agente, a petición expresa de Javier («arregla el error hasta que compruebes que funcione»); eran consultas de solo lectura.
+- **Objetivo:** el segundo paso del orden acordado para cerrar F3, revalidar P1 y P2 en modo streaming, pendiente desde el 31-07. Hasta ahora todo se había ejecutado en batch sobre fuentes acotadas: se lee todo y luego se ordena.
+- **Medir antes de lanzar** (`st_00_desorden.sql`). En streaming, la marca de agua (lo máximo visto − 30 s) descarta sin avisar lo que llega tarde. Por topic y partición, en orden de lectura:
+  - **Mezcla de datasets.** En las mismas particiones conviven 2020 (apt29) y 2023 (LSASS), y ni siquiera llegan en orden cronológico: LSASS_02 va detrás de LSASS_01. Da retrasos de **3,3 años**. Es un efecto de reproducir capturas históricas a la vez; en producción no existe.
+  - **Desorden real**, dentro de cada dataset, en `det.alerts`: peor caso **293 s** (apt29). Con 30 s se perderían **220 alertas (18 %)**; con 5 min, ninguna.
+    - Lo causan los detectores en paralelo, y está **inflado por la velocidad de reproducción**: la detección va a unos 630 eventos/s, decenas de veces más rápido que el tiempo real, así que segundos de retraso de reloj se convierten en minutos de tiempo de evento.
+  - **Los flujos de P1 y P2**, escritos en batch sin ordenar: el 78 % y el 74 % de su contenido habría llegado «tarde». Con eso, P1 habría perdido casi toda su evidencia en streaming.
+- **Decisión (Javier):** publicar los flujos **en orden de tiempo de evento** (`ORDER BY` en `p1_06` y `p2_02`) y mantener la marca de agua de 30 s.
+  - Así se aísla lo que se quiere comprobar: que el patrón y las campañas salen igual.
+  - El desorden de `det.alerts` queda medido para la cadena continua: hará falta una marca de agua de unos 5 min.
+  - Comprobado después: 0 desordenados en los dos flujos.
+- **Segundo nivel en streaming = ventana de sesión.** La agrupación por hueco del batch (LAG + SUM OVER sobre todo el corpus) tiene su equivalente nativo, `SESSION(...)`, sobre `MATCH_ROWTIME()` del primer nivel.
+- **Resultado: idéntico a batch.**
+  - **P1:** las 11 campañas con el mismo inicio, fin y transiciones (52), y ninguna evidencia descartada.
+  - **P2:** 13 transiciones y la campaña SCRANTON → NASHUA de 03:09:23.801 a 03:17:59.493, con 17 aristas.
+- **Observado:** la ventana de sesión **no** emite la campaña una vez al cerrarse, sino que la **actualiza** (`-U`/`+U`) con cada transición.
+  - Para detectar es mejor: la campaña existe desde la primera transición y se completa sola.
+  - Pero emitir en streaming exigirá un destino que admita actualizaciones (*upsert* por campaña), no un topic de solo añadir.
+- **Tres limitaciones de Flink 2.2**, documentadas en `st_02_p2.sql`:
+  1. Una ventana de sesión sobre una **vista** de una tabla cuyo tiempo es una columna calculada falla con «Conversion to relational algebra failed to preserve datatypes»: la vista pierde la marca `*ROWTIME*`. Se resuelve aplicándola sobre la tabla.
+  2. Una **vista** que contiene una ventana de sesión con `PARTITION BY` de varias columnas se crea y `DESCRIBE` la muestra bien, pero al consultarla falla («Column 'tipo' not found»): Flink no sabe volver a expandirla. Se resuelve con subconsultas dentro de una sola sentencia.
+  3. `INTERVAL '300' SECONDS` no vale, porque el campo de segundos es de 2 cifras: hay que escribir `INTERVAL '5' MINUTE`.
+  - Sobre la salida de `MATCH_RECOGNIZE` no aparece ninguna de las dos primeras.
+- **Pendiente:**
+  - emisión de campañas en streaming, con destino *upsert*;
+  - dimensionar la marca de agua de la cadena continua (unos 5 min con la reproducción acelerada; a velocidad real debería bastar con segundos) y llevar los tardíos a `dlq.late`;
+  - el enriquecimiento de P2 (mapa IP → host) en continuo, como tabla de consulta.
+- **Siguiente paso:** P3 (descubrimiento y escalada), el tercero del orden acordado.
+- **Archivos tocados:** `infra/flink/jobs/{st_00_desorden,st_01_p1,st_02_p2,p1_06_flujo,p2_02_flujo}.sql`, `docs/ROADMAP.md`, `BITACORA.md`.
