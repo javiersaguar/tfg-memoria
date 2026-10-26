@@ -932,3 +932,33 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
     - recolocado al llegar París → Tokio (medio);
     - retoma tras arrastrar.
 - **Archivos tocados:** `frontend/src/componentes/tierra/{camara.ts,camara.test.ts,IluminacionGlobo.tsx}`, `frontend/src/paginas/mapa/{GloboMundial.tsx,PaginaMapaMundial.tsx,vistaGlobo.ts,vistaGlobo.test.ts}`, `frontend/src/paginas/conciencia/Globo3D.tsx`, `frontend/e2e/mapa.spec.ts`, `frontend/README.md`, skill del portal, `BITACORA.md`.
+
+### 2026-10-25 — P2 en Flink, paso 0: el orden del salto, y el corpus que había caducado en Redpanda
+- **Con qué/quién:** Claude Code, sesión guiada, con los comandos ejecutados por Javier. Se retoma F3 donde se dejó el 15-09: portar P2 a `MATCH_RECOGNIZE`.
+- **Comprobación de partida:** el oráculo de P2 sigue dando lo mismo que el 14-09. Una campaña, SCRANTON → NASHUA, con:
+  - 17 aristas (135, 5985, 445), `first_seen` 03:09:23.801 y 516 s de duración;
+  - 8 evidencias en el destino y confianza 1,0.
+- **Medición: con la hora del evento, el orden del salto es conexión → ejecución.**
+  - Las 8 evidencias de ejecución en NASHUA llegan después de una conexión desde SCRANTON:
+    - WinRM: 84 y 116 ms;
+    - acceso remoto a LSASS: 1,0 s;
+    - las cuatro creaciones del servicio de PsExec: entre 14 y 24 ms tras su conexión 135.
+  - La única que parece ir antes, a las 03:09:23.000, tiene los milisegundos a cero: es una hora con **resolución de segundo** (Security/PowerShell). Solo se sabe que ocurrió dentro de ese segundo, que incluye el tramo posterior a la conexión (03:09:23.801).
+  - **La cabecera del oráculo queda desmentida en dos puntos:**
+    - «el EID 3 se reporta después del proceso que lo atiende»: era un efecto de la hora de recogida; ahora la conexión va 116 ms antes que `wsmprovhost`;
+    - «PSEXESVC aparece 55 s después de su conexión 445»: ahora son 56 ms.
+  - La ventana de proximidad de 300 s es muy holgada: la evidencia llega en menos de 2 s. Se mantiene de momento para que Flink reproduzca el oráculo.
+- **Decisión (Javier):** P2 en Flink usa la **transición bidireccional de P1**. En cada host de destino se intercalan sus conexiones entrantes y sus evidencias. Vale «conexión → evidencia» y «evidencia → conexión» dentro de la ventana. El orden **se mide** como atributo de la campaña en lugar de exigirse.
+  - Exigirlo obligaba a conocer la resolución de cada hora: añadir `time_source` a `det.alerts` y repetir la detección.
+  - Flink no admite alternativas en `PATTERN`, así que no se puede escribir «A luego B, o B luego A».
+- **Problema encontrado: el corpus había desaparecido de Redpanda.** El primer paso en Flink devolvía conjuntos vacíos sin ningún error.
+  - En las seis particiones de `norm.events` y las tres de `det.alerts`, el primer offset disponible era igual al último. Las cifras coincidían con la carga del 14-09: 88.372 / 87.948 / …, y 197 + 876 + 143 = 1.216 alertas.
+  - Causa: la retención por defecto de Redpanda, `retention.ms` de 7 días. ClickHouse lo conservaba porque guarda su propia copia.
+  - **Arreglo:** `load_f3_corpus.sh` crea ahora los topics del corpus con `retention.ms=-1`. Es un conjunto fijo de evaluación, no un flujo en vivo.
+  - Se recargó con `SUFIJO=f3e DETECT_INSTANCIAS=6`. Salió idéntico al 14-09: 550.494 consumidos, 530.401 normalizados, 20.093 a DLQ, 1.184 alertas en ClickHouse. Esta vez se publicaron 1.201: las republicaciones en los cortes de confirmación varían de una carga a otra. **En Flink hay que deduplicar las alertas por `alert_id`** antes de usarlas como evidencia.
+- **Otro tropiezo, causado por el agente:** el 24-10, `docker compose --profile portal down` borró la red compartida del proyecto, y Redpanda, ClickHouse y Flink no arrancaban («network … not found»). Se resolvió recreando los contenedores con `up -d --force-recreate`, sin tocar los volúmenes. Pendiente: que el portal no pueda borrar la red de los demás.
+- **P2 · paso 0 en Flink** (`infra/flink/jobs/p2_00_tabla.sql`): tabla sobre `norm.events` en modo batch con fuente acotada, y `json.ignore-parse-errors = false` para no descartar nada en silencio.
+  - Las conexiones por dataset y sentido coinciden en las 16 cifras con ClickHouse; apt29 day1 tiene 734 salientes y 495 entrantes.
+  - Las 17 aristas del salto salen con las mismas horas, al milisegundo.
+- **Preparado, sin ejecutar:** `p2_01_aristas.sql`, con el mapa IP → host derivado de las conexiones salientes, el controlador de dominio por comportamiento y las aristas con confirmación bilateral, cada pieza con su comprobación contra el oráculo.
+- **Archivos tocados:** `scripts/load_f3_corpus.sh`, `infra/flink/jobs/p2_00_tabla.sql`, `infra/flink/jobs/p2_01_aristas.sql`, `BITACORA.md`.
