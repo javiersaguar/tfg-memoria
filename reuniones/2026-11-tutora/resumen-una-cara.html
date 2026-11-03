@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Resumen del TFG</title>
+<!-- Resumen de una cara para la tutora, con aspecto de documento Word.
+     Generar el PDF:  node resumen-pdf.mjs  -->
+<style>
+  @page { size: A4; margin: 1.4cm 1.9cm 1.2cm 1.9cm; }
+  :root {
+    --azul: #2F5496;        /* «Énfasis 1» de Word */
+    --azul-claro: #D9E2F3;
+    --azul-medio: #4472C4;
+    --borde: #8EAADB;
+    --texto: #1F1F1F;
+    --gris: #595959;
+  }
+  html { background: #fff; }
+  body {
+    margin: 0;
+    font-family: "Carlito", "Calibri", sans-serif;
+    font-size: 10pt;
+    line-height: 1.22;
+    color: var(--texto);
+    background: #fff;
+  }
+  h1 {
+    font-family: "Carlito", "Calibri Light", sans-serif;
+    font-weight: normal;
+    font-size: 20pt;
+    margin: 0 0 1pt 0;
+    letter-spacing: -0.2pt;
+  }
+  .sub {
+    color: var(--gris);
+    margin: 0 0 5pt 0;
+    padding-bottom: 4pt;
+    border-bottom: 1pt solid var(--azul-medio);
+  }
+  h2 {
+    font-weight: normal;
+    font-size: 12.5pt;
+    color: var(--azul);
+    margin: 6pt 0 2pt 0;
+  }
+  p { margin: 0 0 4pt 0; text-align: justify; }
+  ul { margin: 0 0 3pt 0; padding-left: 14pt; }
+  li { margin: 0 0 1.5pt 0; text-align: justify; }
+  li b { color: var(--azul); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8.9pt;
+    line-height: 1.15;
+  }
+  th {
+    background: var(--azul-medio);
+    color: #fff;
+    text-align: left;
+    padding: 2pt 5pt;
+    border: 0.5pt solid var(--azul-medio);
+  }
+  td {
+    padding: 1.3pt 5pt;
+    border: 0.5pt solid var(--borde);
+    vertical-align: top;
+  }
+  td.fase {
+    background: var(--azul-claro);
+    color: var(--azul);
+    font-weight: bold;
+    vertical-align: middle;
+    white-space: nowrap;
+    width: 1%;
+  }
+  td.tec { font-weight: bold; white-space: nowrap; width: 1%; }
+  .nota { font-size: 8.6pt; color: var(--gris); margin-top: 3pt; }
+</style>
+</head>
+<body>
+
+<h1>Resumen del Trabajo Fin de Grado</h1>
+<div class="sub">Plataforma de conciencia cibersituacional · Javier Saguar Antona · Noviembre de 2026</div>
+
+<p>Las herramientas de seguridad generan cientos de avisos sueltos al día y es difícil saber cuáles forman parte de un
+mismo ataque. El proyecto construye una plataforma que observa en tiempo real la actividad de los equipos de una
+organización, reconoce cuándo varios avisos componen un <b>ataque de varias etapas</b>, lo explica y ayuda a decidir qué
+atender primero.</p>
+
+<h2>Lo realizado hasta ahora</h2>
+<ul>
+  <li><b>Fase 0 · Preparación.</b> Plan de trabajo, entorno completo en contenedores y conjuntos de datos públicos con
+      ataques reales grabados, entre ellos la emulación del grupo APT29 que publica MITRE.</li>
+  <li><b>Fase 1 · Recepción y traducción de los datos.</b> Los registros de Windows llegan como un flujo continuo y se
+      traducen a un formato estándar común. Se traduce el 96&nbsp;%; el resto se guarda aparte con su motivo.</li>
+  <li><b>Fase 2 · Detección de acciones sospechosas.</b> Unas 2.000 reglas públicas marcan acciones concretas de
+      ataque (unos 1.200 avisos en los datos de prueba). Un modelo de aprendizaje automático señala además los periodos
+      anómalos de cada equipo y separa casi a la perfección los de ataque de los normales. También he montado un
+      laboratorio aislado que genera ataques controlados.</li>
+  <li><b>Fase 3 · Ataques de varias etapas (casi cerrada).</b> Tres patrones unen avisos sueltos en una «campaña»
+      ordenada: robo de contraseñas, salto de un equipo a otro y escalada de privilegios con reconocimiento. Detectan
+      todas las variantes de robo de contraseñas de prueba, reproducen el orden real del ataque de APT29 y dan el mismo
+      resultado en tiempo real que sobre datos guardados. Queda medir las falsas alarmas.</li>
+  <li><b>Adelanto de la fase 8 · Portal web.</b> Pantallas de demostración: situación general, recorrido del ataque paso
+      a paso, línea temporal, mapa mundial y un asistente que recomienda (sin ejecutar) acciones de respuesta.</li>
+</ul>
+<p><b>Próximas fases:</b> inteligencia de amenazas (dic.), grafo de ataque razonado (feb.), priorización explicable de
+incidentes (mar.), evaluación (abr.) y memoria y defensa (may.–jun. 2027).</p>
+
+<h2>Por qué cada tecnología</h2>
+<table>
+  <thead><tr><th>Fase</th><th>Tecnología</th><th>Motivo de la elección</th></tr></thead>
+  <tbody>
+    <tr><td class="fase">F0 · Base</td><td class="tec">Docker</td><td>El sistema arranca con una orden y se reproduce igual en cualquier equipo.</td></tr>
+    <tr><td class="fase" rowspan="7">F1 · Datos</td><td class="tec">Datasets OTRF</td><td>Ataques reales grabados y públicos, como la emulación de APT29 de MITRE.</td></tr>
+    <tr><td class="tec">Sysmon</td><td>El registro de Windows más detallado de procesos, red y memoria.</td></tr>
+    <tr><td class="tec">Python</td><td>El lenguaje de referencia en datos; con él se traduce cada evento.</td></tr>
+    <tr><td class="tec">Redpanda</td><td>Compatible con Kafka, el estándar del sector, pero mucho más ligero.</td></tr>
+    <tr><td class="tec">OCSF</td><td>Formato abierto de la industria: reglas válidas sea cual sea la fuente.</td></tr>
+    <tr><td class="tec">ClickHouse</td><td>Base de datos analítica muy rápida para consultar y verificar resultados.</td></tr>
+    <tr><td class="tec">Prometheus + Grafana</td><td>Miden latencia y rendimiento, que forman parte de la evaluación.</td></tr>
+    <tr><td class="fase" rowspan="4">F2 · Detección</td><td class="tec">Sigma + pySigma</td><td>Miles de reglas abiertas de la comunidad, traducidas a nuestro formato.</td></tr>
+    <tr><td class="tec">Isolation Forest</td><td>Detecta anomalías sin necesitar ejemplos de ataque etiquetados.</td></tr>
+    <tr><td class="tec">MLflow</td><td>Registra cada experimento de aprendizaje para repetirlo y compararlo.</td></tr>
+    <tr><td class="tec">Atomic Red Team</td><td>Lanza técnicas de ataque conocidas en un laboratorio aislado (VirtualBox).</td></tr>
+    <tr><td class="fase">F3 · Etapas</td><td class="tec">Apache Flink</td><td>Reconoce secuencias de eventos en tiempo real describiendo el patrón en SQL.</td></tr>
+    <tr><td class="fase" rowspan="4">F4 · Inteligencia</td><td class="tec">MITRE ATT&amp;CK</td><td>El catálogo común de técnicas de ataque que usa todo el sector.</td></tr>
+    <tr><td class="tec">OpenCTI (STIX)</td><td>Plataforma abierta de inteligencia de amenazas con el formato estándar.</td></tr>
+    <tr><td class="tec">SecureBERT</td><td>Modelo de lenguaje ya entrenado en ciberseguridad; basta con afinarlo.</td></tr>
+    <tr><td class="tec">Dagster</td><td>Programa las tareas periódicas y registra cada ejecución.</td></tr>
+    <tr><td class="fase" rowspan="3">F5 · Grafo</td><td class="tec">Neo4j + GDS</td><td>Base de datos de grafos con algoritmos de rutas y centralidad incluidos.</td></tr>
+    <tr><td class="tec">Datalog (Soufflé)</td><td>Razonamiento lógico: cada ruta de ataque deducida lleva su justificación.</td></tr>
+    <tr><td class="tec">PyTorch</td><td>Aprende sobre el grafo y propone conexiones que el razonador verifica.</td></tr>
+    <tr><td class="fase" rowspan="2">F6 · Prioridad</td><td class="tec">FastAPI</td><td>API en Python, el lenguaje del resto, con documentación automática.</td></tr>
+    <tr><td class="tec">SHAP</td><td>Explica cuánto aporta cada factor a la puntuación de un incidente.</td></tr>
+    <tr><td class="fase">F8 · Portal</td><td class="tec">React</td><td>La biblioteca web más usada, con buenas piezas para grafos y mapas.</td></tr>
+    <tr><td class="fase" rowspan="2">F9 · Despliegue</td><td class="tec">Kubernetes</td><td>Despliega la plataforma como en un entorno real, no en un solo equipo.</td></tr>
+    <tr><td class="tec">MinIO</td><td>Almacén de modelos y datos compatible con S3, sin depender de la nube.</td></tr>
+    <tr><td class="fase">FA · Ampliación</td><td class="tec">CALDERA</td><td>Simula ataques completos de varias etapas para obtener más datos.</td></tr>
+  </tbody>
+</table>
+<p class="nota">De F0 a F3 y F8, en uso; de F4 en adelante, previsto. La ampliación (FA) solo se hará si el núcleo
+está cerrado a finales de febrero. Todas son de código abierto y funcionan en un único ordenador.</p>
+
+</body>
+</html>

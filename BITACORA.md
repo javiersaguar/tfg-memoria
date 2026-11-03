@@ -1137,3 +1137,42 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - pendientes: los **falsos positivos** y la **ratio de reducción** de los tres patrones (hoy solo la de P1).
 - **Siguiente paso:** los falsos positivos, el cuarto del orden acordado.
 - **Archivos tocados:** `infra/flink/jobs/{p3_comun,p3_01_flujo,p3_02_campanas,p3_03_emision,st_03_p3}.sql`, `docs/ROADMAP.md`, `BITACORA.md`.
+
+### 2026-11-03 — Reunión de noviembre con la tutora y memoria puesta al día
+- **Con qué/quién:** Claude Code.
+- **Objetivo:** preparar la reunión de seguimiento con Carmen Sánchez-Zas (la del 26-10 se celebró: Javier presentó la idea y el boceto 2D del portal y el TFG quedó aceptado) y dejar la memoria LaTeX al día.
+- **Hecho:**
+  - `reuniones/2026-11-tutora/`:
+    - `resumen-una-cara.pdf`: resumen no técnico de una página para Carmen, con aspecto de Word. Explica cada fase y el porqué de cada tecnología de todas las fases (de F0 a F9 y la ampliación FA, incluido CALDERA). Se genera desde `resumen-una-cara.html` con `node resumen-pdf.mjs`.
+    - `estado-noviembre.pdf`: guía personal, no se envía. Incluye guion de la reunión, detalle técnico, calendario con el 18-03-2027 (límite para inscribir el TFG) y el 13-05-2027 (título definitivo), las dudas del correo y respuestas preparadas.
+    - `correo-carmen.md`: borrador. El correo final lo redactó Javier, y solo adjunta el resumen de una página.
+  - **Memoria:**
+    - **Portada, página del tribunal y título provisional**, con Carmen como tutora y el DIT como departamento.
+    - **Huecos fuera:** sin las cinco páginas en blanco forzadas; las secciones vacías de F4-F7 quedan comentadas en lugar de imprimir títulos sin texto.
+    - **Nuevo en el cuerpo:**
+      - figura de arquitectura (TikZ);
+      - sección del laboratorio de emulación, que la memoria anunciaba sin tenerla;
+      - sección completa del **Pilar A** (`sections/pilarA.tex`): corpus, método del oráculo, correlación en dos niveles con su figura, P1, P2, P3, esquema común, validación en streaming e incidencias de tiempo e identidad;
+      - protocolo de evaluación;
+      - líneas de trabajo futuro.
+    - **Anexos con formato «Anexo A»:**
+      - A, aspectos éticos, y B, presupuesto: pasan del cuerpo a anexos, como en la plantilla de la ETSIT;
+      - C, esquema de campaña;
+      - D, patrones en Flink SQL;
+      - E, entorno y reproducibilidad;
+      - F, licencias, comprobadas en GitHub y Hugging Face.
+    - Glosario ampliado.
+- **Resultado:** la memoria compila sin errores ni referencias rotas. El cuerpo (Introducción a Conclusiones) ocupa 46 páginas.
+- **Extensión:** la búsqueda apunta a un máximo de **60 páginas de cuerpo** en la normativa de GISD (sin índices, resúmenes, glosario, bibliografía ni anexos). El PDF oficial no se pudo descargar por un fallo de certificado del servidor de la ETSIT: **hay que confirmarlo**. Quedan unas 14 páginas para F4-F7, así que el detalle técnico debe seguir yendo a anexos.
+- **Trampa encontrada:** con babel en español, el `>` de una flecha TikZ (`<->`) rompe la compilación. Se resuelve con `\usetikzlibrary{babel}`.
+- **Pendiente:**
+  - confirmar el límite de páginas y las fechas en la reunión;
+  - horas y amortización del presupuesto;
+  - conclusiones al cierre;
+  - el anexo de aspectos éticos aún hablaba de «ML solo en inferencia», contradicho por la revisión del 26-07. Ya está corregido; vigilar que no queden más restos en otros capítulos.
+- **Archivos tocados:**
+  - `reuniones/2026-11-tutora/*`;
+  - `Memoria/main.tex`, `Memoria/intro/{cover,cover_orange,author}.tex`;
+  - `Memoria/sections/{desarrollo,pilarA,resultados,conclusiones,presupuesto,aspectos,glosario,introduccion}.tex`;
+  - `Memoria/anexos/{esquema_campana,patrones_flink,reproducibilidad,licencias}.tex`;
+  - `Memoria/anexos/anexoA.tex`, eliminado: era la plantilla vacía.

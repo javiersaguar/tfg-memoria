@@ -1,0 +1,347 @@
+\section{Pilar A: detección de secuencias multi-etapa}
+\label{sec:pilarA}
+
+La detección basada en reglas descrita en la Sección~\ref{sec:deteccion-reglas} produce
+alertas aisladas: cada una señala una técnica concreta en un instante concreto. El Pilar~A
+transforma esas alertas en \textbf{campañas}, es decir, en conjuntos de evidencias que el
+sistema reconoce como etapas sucesivas de un mismo ataque. Esta sección describe el corpus
+sobre el que se ha construido, el método de validación, la estructura de correlación en dos
+niveles que impone la herramienta, los tres patrones implementados, el esquema común en que
+se emiten las campañas y su validación en modo continuo.
+
+\subsection{Corpus de evaluación y verdad conocida}
+
+Todo el trabajo de esta fase se apoya en un \textbf{corpus fijo y reproducible}, cargado
+mediante un único guion que recrea los \textit{topics}, reproduce los conjuntos de datos y
+los procesa con grupos de consumo nuevos (Anexo~\ref{anx:reproducibilidad}). El corpus reúne
+nueve conjuntos de datos: el primer día de la emulación de APT29 publicada por MITRE, una
+captura atómica de volcado de LSASS mediante \texttt{comsvcs.dll} y siete campañas de robo
+de credenciales que emplean siete herramientas distintas.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|r|}
+\hline
+\textbf{Magnitud} & \textbf{Valor} \\
+\hline
+Eventos consumidos & 550.494 \\
+Eventos normalizados a OCSF & 530.401 (96,4\,\%) \\
+Eventos derivados a la cola de rechazos & 20.093 \\
+Reglas Sigma evaluadas & 2.093 \\
+Alertas distintas producidas & 1.184 \\
+\quad de ellas, en el primer día de APT29 & 741 \\
+\hline
+\end{tabular}
+\caption{Corpus de evaluación del Pilar A.}
+\label{tab:corpus-f3}
+\end{table}
+
+La totalidad de los rechazos corresponde a tipos de evento sin mapeador, y en torno al 60\,\%
+son marcadores de inicio y fin de bloques de PowerShell sin contenido. Ningún evento de
+acceso a procesos ni de creación de ficheros figura entre ellos, de modo que la evidencia
+central del robo de credenciales se normaliza sin pérdida.
+
+La \textbf{verdad conocida} del primer día de APT29 se reconstruyó a partir del plan de
+emulación publicado: 28 pasos agrupados en 10 etapas, con su equipo y usuario. Los
+identificadores de técnica del plan corresponden a versiones antiguas de ATT\&CK y varios
+están obsoletos (por ejemplo, \texttt{T1086} es hoy \texttt{T1059.001} y \texttt{T1088} es
+\texttt{T1548.002}). Sin traducirlos, el cruce entre el plan y las alertas no cuadra y
+aparenta fallos de detección que no lo son.
+
+\subsection{Método: versión de referencia y versión en flujo}
+
+Cada patrón se ha implementado \textbf{dos veces}. La primera es una vista SQL sobre el
+almacén analítico que procesa el corpus completo por lotes y actúa como
+\textbf{oráculo}: fija el resultado esperado. La segunda es la implementación en Flink con
+\texttt{MATCH\_RECOGNIZE}, que debe reproducir ese resultado.
+
+El valor de este método es separar las fuentes de error. Sin oráculo, depurar el patrón
+obliga a dudar a la vez de su lógica y de la semántica temporal del motor; con él, la
+pregunta se reduce a por qué no aparece lo que se sabe que existe. El método funciona en
+ambos sentidos: en un caso fue la versión en flujo la que reveló un defecto del oráculo, que
+descartaba la captura atómica por exigir contexto alrededor de las evidencias, requisito que
+penaliza precisamente las capturas más limpias.
+
+Para validar en Flink sin depender del avance de las marcas de agua, la fuente del bus se
+configura como \textbf{acotada} (se lee hasta el último desplazamiento disponible) y el
+motor se ejecuta en modo por lotes. Así cada consulta produce un resultado final, comparable
+fila a fila con el oráculo. La validación en modo continuo se aborda por separado en la
+Sección~\ref{sec:pilarA-streaming}.
+
+\subsection{Correlación en dos niveles}
+\label{sec:dos-niveles}
+
+La intuición inicial era expresar cada campaña con un único patrón: «todas las evidencias
+consecutivas de un mismo equipo hasta que se abra un hueco de más de diez minutos». Esa
+expresión resulta \textbf{imposible} con \texttt{MATCH\_RECOGNIZE} en Flink. El motor no
+admite cuantificadores voraces como último elemento de un patrón, y el cuantificador
+reluctante, que sí admite, produce la coincidencia \textit{mínima}: con
+\texttt{PATTERN (E+? C)} se obtienen 29 coincidencias de dos filas donde el oráculo
+reconoce 10 campañas.
+
+La solución es una \textbf{correlación jerárquica en dos niveles}, que aquí deja de ser una
+opción de diseño para convertirse en un requisito impuesto por la herramienta:
+
+\begin{enumerate}
+    \item \textbf{Nivel 1, transiciones.} \texttt{MATCH\_RECOGNIZE} reconoce pares de
+    evidencias consecutivas que cumplen la condición del patrón dentro de una ventana
+    temporal. Es lo que un motor CEP hace bien.
+    \item \textbf{Nivel 2, campañas.} Una agregación agrupa las transiciones separadas por
+    un hueco menor que la ventana. Es lo que un motor CEP hace mal y una agregación resuelve
+    de forma trivial. En lotes se implementa con funciones de ventana analíticas; en flujo,
+    con una ventana de sesión sobre el tiempo de cada transición.
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  ev/.style={circle,draw=black!70,fill=black!10,minimum size=4mm,inner sep=0pt},
+  evc/.style={ev,fill=black!55},
+  tr/.style={-{Stealth[length=2mm]},thick},
+  font=\footnotesize]
+  \foreach \x/\t in {0/ev,1.1/evc,2.0/ev,3.2/evc,7.4/ev,8.4/evc,9.3/ev} {
+    \node[\t] at (\x,0) {};
+  }
+  \draw[tr] (0.15,0.25) to[bend left=40] (0.95,0.25);
+  \draw[tr] (1.25,0.25) to[bend left=40] (1.85,0.25);
+  \draw[tr] (2.15,0.25) to[bend left=40] (3.05,0.25);
+  \draw[tr] (7.55,0.25) to[bend left=40] (8.25,0.25);
+  \draw[tr] (8.55,0.25) to[bend left=40] (9.15,0.25);
+  \node[anchor=west] at (9.8,0.45) {Nivel 1: transiciones};
+  \draw[thick] (-0.2,-0.45) -- (3.4,-0.45);
+  \draw[thick] (-0.2,-0.35) -- (-0.2,-0.55); \draw[thick] (3.4,-0.35) -- (3.4,-0.55);
+  \draw[thick] (7.2,-0.45) -- (9.5,-0.45);
+  \draw[thick] (7.2,-0.35) -- (7.2,-0.55); \draw[thick] (9.5,-0.35) -- (9.5,-0.55);
+  \node at (1.6,-0.8) {campaña 1};
+  \node at (8.35,-0.8) {campaña 2};
+  \draw[<->,dashed] (3.4,-0.15) -- node[above] {hueco $>$ ventana} (7.2,-0.15);
+  \node[anchor=west] at (9.8,-0.45) {Nivel 2: agregación por hueco};
+  \draw[->] (-0.4,-1.25) -- (12.8,-1.25) node[right] {$t$};
+\end{tikzpicture}
+\caption{Correlación en dos niveles. Los círculos oscuros son evidencias de la etapa ancla
+del patrón; las flechas, las transiciones reconocidas por \texttt{MATCH\_RECOGNIZE}.}
+\label{fig:dos-niveles}
+\end{figure}
+
+La implementación encontró además otras restricciones del motor, que condicionan la forma
+de escribir los patrones: la cláusula \texttt{DEFINE} no admite subconsultas, por lo que la
+lógica sobre listas de técnicas se precalcula en la proyección; \texttt{COUNT(DISTINCT)} no
+está permitido en \texttt{MEASURES}; y \texttt{WITHIN} acota la duración total de la
+coincidencia y no el hueco entre elementos, por lo que la ventana se expresa como condición
+en \texttt{DEFINE}.
+
+Una restricción adicional determina la arquitectura. \texttt{MATCH\_RECOGNIZE} exige ordenar
+por un atributo de tiempo de evento, y Flink lo pierde al atravesar uniones y agregaciones.
+Por ello, cada patrón se divide en dos trabajos desacoplados por el bus: uno de
+\textbf{preparación} publica en un \textit{topic} intermedio la evidencia del patrón, sin
+repeticiones y en orden de tiempo de evento, y otro de \textbf{reconocimiento} la relee con
+su marca de agua. Es también la arquitectura adecuada para producción, pues separa el
+enriquecimiento del reconocimiento. El Anexo~\ref{anx:patrones} recoge el código del
+patrón P1 como ejemplo.
+
+\subsection{P1: robo de credenciales}
+
+P1 reconoce la secuencia herramienta $\rightarrow$ acceso a la memoria de LSASS
+$\rightarrow$ volcado $\rightarrow$ limpieza. Su diseño se decidió con datos en tres puntos.
+
+\textbf{El ancla es la familia \texttt{T1003.*} y no la subtécnica \texttt{T1003.001}.}
+Medido sobre las siete variantes, la subtécnica exacta cubre seis: falla precisamente
+Mimikatz, la variante más emblemática, porque Meterpreter lo ejecuta dentro de su propio
+proceso y ningún proceso externo abre la memoria de LSASS. La familia cubre las siete.
+
+\textbf{Las etapas se reconocen por el tipo de evento de origen}, restringido a alertas de
+la familia \texttt{T1003}: un acceso a proceso es acceso a LSASS, una creación de proceso es
+ejecución de la herramienta y una creación de fichero es volcado a disco. Una primera versión
+reconocía las etapas por los campos coincidentes de la regla y producía evidencia falsa: las
+292 alertas de un \textit{dropper} de PowerShell de APT29 satisfacían la etapa «volcado a
+fichero» sin relación alguna con credenciales. Con la restricción, la evidencia de P1 en el
+equipo SCRANTON pasa de 308 alertas a 3.
+
+\textbf{La transición es bidireccional}: basta con que una de sus dos evidencias sea de
+credenciales, de modo que valen tanto «preparación $\rightarrow$ credenciales» como
+«credenciales $\rightarrow$ limpieza». Con la versión unidireccional se perdía el equipo
+NASHUA, donde la limpieza llega después del único acceso a credenciales. La ventana es de
+10 minutos, el doble del núcleo observado en APT29 (4\,min 47\,s entre la descarga de la
+herramienta y el acceso a LSASS).
+
+La confianza se \textbf{descompone en factores}: 0,40 por el ancla, más 0,25 si hay acceso a
+LSASS, 0,20 si hay volcado a disco, 0,10 si hay ejecución de la herramienta y 0,15 si hay
+limpieza, con un máximo de 1. El resultado son \textbf{11 campañas}: una por cada una de
+las \textbf{siete variantes} de robo de credenciales, dos en SCRANTON y una en NASHUA dentro
+de APT29, y la captura atómica. La confianza oscila entre 0,50 (Mimikatz, solo ancla y
+contexto) y 0,95 (las variantes con acceso a LSASS y fichero de volcado).
+
+\subsection{P2: movimiento lateral}
+
+P2 reconoce el salto de un equipo a otro: una conexión de red hacia el destino seguida de
+ejecución remota en él. Es el primer patrón que \textbf{cruza equipos}, y requiere
+construir antes las \textbf{aristas} de red a partir de los eventos normalizados.
+
+La construcción de las aristas destapó varios problemas que no producían error alguno.
+Bajo la misma clase OCSF de actividad de red conviven las conexiones lógicas de Sysmon y
+cada flujo permitido por el cortafuegos de Windows; filtrar por clase daba 3.480 conexiones
+WinRM donde el fichero de origen tiene 12. El mapa de direcciones IP a equipos, si cuenta
+también los registros entrantes, se corrompe en silencio: un equipo llegó a ganar su propia
+dirección por un solo voto. Se resolvió contando solo conexiones salientes, en las que la
+dirección de origen es por definición la propia. Y la dirección de bucle local escrita sin
+abreviar fabricaba aristas falsas hasta que se normalizó su grafía.
+
+Con el mapa corregido y el controlador de dominio identificado por su comportamiento y
+excluido, quedan 39 aristas: 22 hacia el controlador y \textbf{17 de SCRANTON a NASHUA}
+(puertos 135, 445 y 5985), todas confirmadas desde los dos extremos. Sobre ellas, el nivel~1
+reconoce en cada destino una arista y una evidencia de ejecución (técnicas \texttt{T1021},
+\texttt{T1569.002} y \texttt{T1003}) separadas como máximo 300 segundos, en cualquier orden,
+y el nivel~2 agrupa las transiciones de un mismo par de equipos.
+
+El resultado es \textbf{una campaña}, idéntica campo a campo a la del oráculo: de las
+03:09:23.801 a las 03:17:59.493, con 8 evidencias en el destino, cuatro etapas (conexión,
+ejecución remota, credenciales y servicio) y confianza 1,0. El orden no se exige pero se
+\textbf{mide}: siete de las ocho evidencias llegan después de su conexión, con un retraso
+máximo de 1.004\,ms. La octava tiene una hora de resolución de segundo y no permite ordenar
+dentro de ese segundo.
+
+\subsection{P3: escalada de privilegios con descubrimiento o persistencia}
+
+El inventario previo mostró que \textbf{las reglas no ven el descubrimiento del atacante}
+en APT29: solo hay dos alertas de la táctica en todo el día, y ambas proceden del agente de
+la nube del equipo. El descubrimiento real está en los bloques de PowerShell registrados
+(\texttt{Invoke-Discovery}, \texttt{Get-Process} remoto). Por ello P3 es el primer patrón
+\textbf{híbrido}: su etapa de descubrimiento combina alertas Sigma y eventos de PowerShell
+con instrucciones de reconocimiento.
+
+El ancla es la \textbf{escalada de privilegios} (técnicas \texttt{T1548}, \texttt{T1134},
+\texttt{T1055} y \texttt{T1068}), acompañada de descubrimiento o de persistencia
+(\texttt{T1547}, \texttt{T1543}, \texttt{T1053}, \texttt{T1546}, \texttt{T1037} y
+\texttt{T1136}) en el mismo equipo. Los eventos de asignación de privilegios especiales se
+descartaron como etapa porque aparecen en todos los equipos de forma rutinaria. Se aplica
+una única exclusión, medida: la modificación de claves de arranque que escribe el
+explorador de Windows al iniciar sesión, que eliminaba 28 evidencias espurias. Una segunda
+exclusión prevista para los agentes de la nube se retiró al comprobar que no eliminaba
+nada: una exclusión sin efecto es un ajuste especulativo.
+
+El resultado son \textbf{3 campañas}. En APT29, la de SCRANTON (confianza 0,90) reproduce
+el orden exacto del plan del atacante: escalada $\rightarrow$ descubrimiento $\rightarrow$
+persistencia. Las otras dos son las capturas de robo de credenciales que incluyen escalada
+real (confianza 0,75). Lo que el patrón \textbf{deja fuera} es tan relevante como lo que
+detecta: el controlador de dominio, con 25 evidencias de descubrimiento producidas por un
+guion de monitorización legítimo, y cinco capturas con entre 26 y 64 evidencias de
+reconocimiento no forman campaña porque no hay escalada. El software legítimo hace el mismo
+reconocimiento que un atacante; es la secuencia lo que los distingue.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{|l|p{4.3cm}|p{5.2cm}|}
+\hline
+\textbf{Patrón} & \textbf{Qué reconoce} & \textbf{Resultado} \\
+\hline
+P1 Robo de credenciales & Herramienta, acceso a LSASS, volcado y limpieza & 11 campañas; las 7 variantes de robo de credenciales detectadas \\
+\hline
+P2 Movimiento lateral & Conexión a otro equipo y ejecución remota en el destino & 1 campaña SCRANTON $\rightarrow$ NASHUA, 17 aristas bilaterales \\
+\hline
+P3 Escalada & Escalada con descubrimiento o persistencia & 3 campañas; orden del plan de APT29 reproducido \\
+\hline
+\end{tabular}
+\caption{Patrones del Pilar A y resultados sobre el corpus. En los tres, la versión en
+Flink reproduce exactamente su oráculo.}
+\label{tab:patrones}
+\end{table}
+
+\subsection{Esquema común de campaña}
+
+Las campañas de los tres patrones se emiten con un \textbf{esquema común}, que es lo que
+consumirán el grafo de ataque, la priorización y la interfaz. Por coherencia con el resto
+del sistema, una campaña es un hallazgo estándar \textbf{OCSF 1.5.0 «Detection Finding»}
+(clase 2004). Todo lo que el estándar contempla va en sus campos: las alertas relacionadas,
+las técnicas, la confianza y el intervalo temporal. Lo que no contempla va en una extensión
+propia documentada: las \textbf{etapas ordenadas}, los \textbf{factores de confianza}, cuya
+suma es la confianza publicada, los equipos con su papel y las métricas de cada patrón. Las
+técnicas se publican sin táctica asociada, porque las alertas traen ambas listas sin
+emparejar y emparejarlas sería inventar.
+
+Dos reglas garantizan que el resultado sea reproducible. La identidad de cada campaña es un
+resumen criptográfico de su conjunto de datos, patrón, clave y hora de inicio, de modo que
+reprocesar el corpus produce los mismos identificadores y la tabla de destino sobrescribe en
+lugar de duplicar. Las etapas se ordenan por el segundo de su primera evidencia y, dentro
+del mismo segundo, por el orden lógico del patrón, porque parte de las horas de origen solo
+tienen resolución de segundo. El proceso que vuelca las campañas al almacén
+\textbf{valida cada documento} y se detiene ante el primero que no cumpla el esquema. El
+almacén contiene hoy 15 campañas: 11 de P1, 1 de P2 y 3 de P3. El
+Anexo~\ref{anx:esquema} detalla el esquema con un ejemplo completo.
+
+\subsection{Validación en modo continuo}
+\label{sec:pilarA-streaming}
+
+La validación anterior se realizó con fuentes acotadas. En modo continuo, la marca de agua
+descarta sin aviso los eventos que llegan con más retraso del admitido, por lo que antes de
+lanzar los patrones se \textbf{midió el desorden} de llegada:
+
+\begin{itemize}
+    \item Dentro de un mismo conjunto de datos, las alertas llegan con hasta 293\,s de
+    retraso respecto a otras posteriores, por efecto de los detectores en paralelo. Con una
+    marca de agua de 30\,s se perderían 220 alertas (18\,\%); con 5 minutos, ninguna. La
+    cifra está inflada porque el corpus se reproduce decenas de veces más rápido que el
+    tiempo real.
+    \item Los \textit{topics} intermedios, escritos inicialmente sin ordenar, habrían
+    llegado «tarde» en un 74--78\,\%. Se decidió publicarlos en orden de tiempo de evento.
+    \item Al reproducir a la vez capturas de distintos años, el desorden entre conjuntos de
+    datos alcanza años. Es un artefacto de la reproducción que no existe en producción.
+\end{itemize}
+
+Con los \textit{topics} intermedios ordenados, el segundo nivel se expresa con una ventana de
+sesión y los tres patrones dan en flujo \textbf{exactamente el mismo resultado} que por lotes:
+las 11 campañas de P1 con sus 52 transiciones, la campaña de P2 y las 3 de P3. La ventana de
+sesión no emite cada campaña una sola vez al cerrarse, sino que la \textbf{actualiza} con cada
+transición nueva. Para detectar es una ventaja, porque la campaña existe desde su primera
+transición, pero obliga a emitirla hacia un destino que admita actualizaciones.
+
+\subsection{Incidencia: la hora de los eventos era la de recogida}
+
+El primer día de APT29 no incluye el campo de hora de creación del evento, y la
+normalización recurría a la marca del colector, que corresponde al instante de
+\textbf{recepción}. El desfase medido sobre los eventos que sí traen la hora real tiene una
+mediana de 6,2\,s, un percentil 95 de 74,9\,s y un máximo de 101,2\,s. Lo grave es su
+dispersión, de 26,7\,s: los eventos se reordenaban entre sí y no había desplazamiento
+constante que corregir.
+
+La corrección establece una cadena de prioridad entre las fuentes de tiempo disponibles, con
+la conversión de zona horaria derivada por conjunto de datos, y marca cada evento con la
+fuente empleada. Ninguna fuente es fiable en todos los conjuntos: la hora UTC de Sysmon, la
+más precisa en APT29, va desviada 19 horas en las capturas de robo de credenciales. Con la
+hora corregida desapareció una inversión imposible documentada hasta entonces, en la que el
+proceso remoto aparecía tres segundos antes que la conexión que lo provoca: la conexión va
+ahora 116\,ms antes. Queda una limitación del dato de origen: el 26,6\,\% de los eventos de
+APT29 solo tiene resolución de segundo.
+
+\subsection{Incidencia: la identidad de los eventos y de las alertas}
+
+Durante esta fase se comprobó que el 15\,\% de los eventos normalizados de APT29 era idéntico
+byte a byte a otro, porque el evento OCSF no conservaba el número de registro de origen. Dos
+ocurrencias distintas con los mismos campos se volvían indistinguibles, y las alertas
+duplicadas por un reprocesado no se podían separar de las legítimas. Se resolvió dando
+\textbf{identidad determinista} a ambos: el evento conserva su número de registro (o, si la
+fuente no lo aporta, el ordinal de la línea en el fichero), la alerta se identifica por el
+resumen del evento y la regla, y las tablas del almacén deduplican por esa identidad. La
+comprobación final fue recuperar exactamente las 741 alertas documentadas para APT29 y las
+cifras de eventos de cada conjunto de datos contadas contra su fichero de origen.
+
+\subsection{Estado de la fase y trabajo pendiente}
+
+Se cumplen los criterios de cierre relativos a la detección: tres patrones que disparan sobre
+datos reales, las siete variantes de robo de credenciales detectadas y campañas multi-etapa
+reconocidas en APT29, con resultados idénticos por lotes y en flujo. Quedan pendientes:
+
+\begin{itemize}
+    \item Medir los \textbf{falsos positivos} sobre la porción benigna del corpus y sobre
+    capturas atómicas de una sola táctica.
+    \item Medir la \textbf{ratio de reducción de alertas} de los tres patrones. La de P1
+    (0,991) no es comparable con la línea base de agrupación de la fase anterior, porque solo
+    cubre lo que P1 absorbe alrededor de sus anclas.
+    \item Decidir la \textbf{extensión de una campaña}: la versión en Flink la acota a su
+    evidencia y el oráculo absorbe $\pm$10 minutos. En P3 la diferencia es grande, porque el
+    descubrimiento llega en ráfagas alrededor del ancla, y condiciona la ratio de reducción.
+    \item Resolver el \textbf{punto ciego del etiquetado}: el 27,1\,\% de las alertas no lleva
+    técnica ATT\&CK y es invisible para la correlación por construcción.
+    \item Incorporar el segundo día de APT29 y emitir las campañas en flujo hacia un destino
+    que admita actualizaciones.
+\end{itemize}

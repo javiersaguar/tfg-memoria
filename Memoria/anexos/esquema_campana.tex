@@ -1,0 +1,97 @@
+\chapter{Esquema de campaña}
+\label{anx:esquema}
+
+Las campañas de todos los patrones del Pilar~A se emiten como hallazgos \textbf{OCSF 1.5.0
+«Detection Finding»} (\texttt{class\_uid} 2004, \texttt{type\_uid} 200401) con una extensión
+propia, \texttt{tfg}. Se publican en el \textit{topic} \texttt{det.campaigns}, sin caducidad,
+y se guardan en la tabla \texttt{tfg.campaigns} del almacén analítico.
+
+\section{Campos del estándar}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{|l|p{8.2cm}|}
+\hline
+\textbf{Campo} & \textbf{Contenido} \\
+\hline
+\texttt{start\_time}, \texttt{end\_time}, \texttt{duration} & Inicio, fin y duración de la campaña, en milisegundos \\
+\texttt{time} & Igual a \texttt{end\_time}, para que reprocesar produzca el mismo documento \\
+\texttt{severity\_id} & Máxima gravedad de las reglas que aportan evidencia \\
+\texttt{confidence\_score} & Suma de los factores de confianza, de 0 a 100 \\
+\texttt{resources[]} & Equipos implicados \\
+\texttt{finding\_info.uid} & Identidad de la campaña \\
+\texttt{finding\_info.analytic} & Patrón que la reconoce (P1, P2, P3) \\
+\texttt{finding\_info.attacks[]} & Técnicas observadas en la evidencia, sin táctica asociada \\
+\texttt{finding\_info.related\_events[]} & Alertas y eventos de evidencia, una vez cada uno \\
+\hline
+\end{tabular}
+\caption{Campos del estándar OCSF empleados.}
+\end{table}
+
+\section{Extensión propia}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{|l|p{9cm}|}
+\hline
+\textbf{Campo} & \textbf{Contenido} \\
+\hline
+\texttt{tfg.pattern\_id}, \texttt{tfg.dataset\_id} & Patrón y conjunto de datos de origen \\
+\texttt{tfg.devices[]} & Equipos con su papel: \textit{host} en P1 y P3, origen y destino en P2 \\
+\texttt{tfg.tactic\_names[]} & Tácticas de la evidencia, por nombre \\
+\texttt{tfg.stages[]} & Etapas ordenadas, cada una con su intervalo, sus técnicas y sus evidencias \\
+\texttt{tfg.confidence\_factors} & Factores presentes y su peso; su suma es la confianza \\
+\texttt{tfg.metrics} & Métricas propias del patrón (aristas, transiciones, alertas en la ventana) \\
+\hline
+\end{tabular}
+\caption{Campos de la extensión \texttt{tfg}.}
+\end{table}
+
+\section{Reglas de construcción}
+
+\begin{itemize}
+    \item \textbf{Identidad}: \texttt{md5(dataset | patrón | clave | inicio en ms)}, donde la
+    clave es el equipo en P1 y P3 y el par origen--destino en P2. Es determinista.
+    \item \textbf{Orden de las etapas}: por el segundo de la primera evidencia de cada etapa y,
+    dentro del mismo segundo, por el orden lógico del patrón.
+    \item \textbf{Una evidencia puede probar dos etapas} (el acceso remoto a LSASS mediante
+    WinRM es a la vez ejecución remota y acceso a credenciales). Aparece en las dos etapas,
+    pero una sola vez en \texttt{related\_events}.
+    \item \textbf{Validación}: el proceso de volcado comprueba la clase, la coherencia de los
+    tiempos, que la confianza sea la suma de sus factores, que las etapas estén numeradas de 1
+    a $n$ con su evidencia y que no haya evidencias repetidas.
+\end{itemize}
+
+\section{Ejemplo}
+
+El Listado~\ref{lst:campana-p2} muestra, abreviada, la campaña de movimiento lateral del
+primer día de APT29.
+
+\begin{lstlisting}[caption={Campaña P2 de APT29, abreviada.},label={lst:campana-p2}]
+{
+  "class_uid": 2004, "type_uid": 200401, "activity_id": 1,
+  "start_time": 1588388963801, "end_time": 1588389479493,
+  "duration": 515692, "severity_id": 4, "confidence_score": 100,
+  "message": "Movimiento lateral SCRANTON -> NASHUA",
+  "finding_info": {
+    "uid": "07c1426c17179d180b24073e097edfdc",
+    "analytic": {"uid": "P2", "name": "P2_lateral_movement"},
+    "attacks": [{"technique": {"uid": "T1021"},
+                 "sub_technique": {"uid": "T1021.006"}}],
+    "related_events_count": 8
+  },
+  "tfg": {
+    "pattern_id": "P2",
+    "devices": [{"hostname": "SCRANTON", "role": "origen"},
+                {"hostname": "NASHUA", "role": "destino"}],
+    "stages": [{"order": 1, "name": "conexion_lateral", "count": 17}],
+    "confidence_factors": {"arista": 0.30, "bilateral": 0.15,
+      "proceso_interactivo": 0.10, "ejecucion_remota": 0.20,
+      "servicio": 0.15, "credenciales": 0.10},
+    "metrics": {"aristas": 17, "transiciones": 13,
+      "alertas_absorbidas": 115, "retraso_max_ms": 1004}
+  }
+}
+\end{lstlisting}

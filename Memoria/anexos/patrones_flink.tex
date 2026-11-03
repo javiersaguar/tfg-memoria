@@ -1,0 +1,90 @@
+\chapter{Implementación de los patrones en Flink SQL}
+\label{anx:patrones}
+
+Cada patrón se organiza en los mismos pasos, cada uno en un fichero SQL que se ejecuta con el
+cliente de Flink y una definición común de tablas y vistas que se carga al inicio:
+
+\begin{enumerate}
+    \item \textbf{Flujo}: publica en un \textit{topic} intermedio
+    (\texttt{det.p1\_flujo}, \texttt{det.p2\_flujo}, \texttt{det.p3\_flujo}) la evidencia del
+    patrón, sin repeticiones y en orden de tiempo de evento.
+    \item \textbf{Campañas}: correlación en dos niveles sobre ese flujo.
+    \item \textbf{Emisión}: construcción del hallazgo OCSF y publicación en
+    \texttt{det.campaigns}.
+    \item \textbf{Flujo continuo}: el mismo patrón en modo \textit{streaming}, con una ventana
+    de sesión como segundo nivel, frente a su resultado por lotes.
+\end{enumerate}
+
+El Listado~\ref{lst:p1} reproduce los dos niveles de P1 en su versión por lotes.
+
+\begin{lstlisting}[language=SQL,caption={P1: transiciones (nivel 1) y campañas (nivel 2).},label={lst:p1}]
+-- NIVEL 1: dos evidencias consecutivas del mismo equipo a <= 10 min,
+-- al menos una de credenciales (transicion bidireccional).
+CREATE TEMPORARY VIEW transiciones_p1 AS
+SELECT *
+FROM (SELECT dataset, host, ts, `time` AS t_ms, cred FROM p1_flujo)
+MATCH_RECOGNIZE (
+    PARTITION BY dataset, host
+    ORDER BY ts
+    MEASURES E.t_ms AS t_ini_ms, C.t_ms AS t_fin_ms
+    ONE ROW PER MATCH
+    AFTER MATCH SKIP TO NEXT ROW
+    PATTERN (E C)
+    DEFINE
+        C AS (C.cred = 1 OR E.cred = 1)
+         AND TIMESTAMPDIFF(SECOND, E.ts, C.ts) <= 600
+) AS t;
+
+-- NIVEL 2: un hueco de mas de 10 min entre transiciones abre campana.
+CREATE TEMPORARY VIEW transiciones_marcadas_p1 AS
+SELECT *,
+       CASE WHEN LAG(t_fin_ms) OVER (PARTITION BY dataset, host
+                                      ORDER BY t_ini_ms) IS NULL
+              OR (t_ini_ms - LAG(t_fin_ms) OVER (PARTITION BY dataset,
+                                      host ORDER BY t_ini_ms)) > 600000
+            THEN 1 ELSE 0 END AS abre
+FROM transiciones_p1;
+
+CREATE TEMPORARY VIEW campanas_base_p1 AS
+SELECT dataset, host, campana,
+       MIN(t_ini_ms) AS inicio, MAX(t_fin_ms) AS fin,
+       COUNT(*) AS transiciones
+FROM (SELECT *, SUM(abre) OVER (PARTITION BY dataset, host
+             ORDER BY t_ini_ms ROWS BETWEEN UNBOUNDED PRECEDING
+             AND CURRENT ROW) AS campana
+      FROM transiciones_marcadas_p1)
+GROUP BY dataset, host, campana;
+\end{lstlisting}
+
+En modo continuo, el segundo nivel se sustituye por una ventana de sesión sobre el tiempo de
+cada transición, que Flink proporciona como \texttt{MATCH\_ROWTIME()}:
+
+\begin{lstlisting}[language=SQL,caption={P3: segundo nivel en modo continuo.},label={lst:p3-sesion}]
+SELECT dataset, host,
+       MIN(t_ini_ms) AS inicio, MAX(t_fin_ms) AS fin,
+       COUNT(*) AS transiciones
+FROM TABLE(SESSION(TABLE transiciones_p3_rt PARTITION BY clave,
+                   DESCRIPTOR(rt), INTERVAL '10' MINUTE))
+GROUP BY clave, dataset, host, window_start, window_end
+HAVING SUM(con_otra) >= 1;
+\end{lstlisting}
+
+\section{Restricciones de Flink 2.2 encontradas}
+
+\begin{itemize}
+    \item No se admiten cuantificadores voraces al final de un patrón, lo que obliga a la
+    correlación en dos niveles (Sección~\ref{sec:dos-niveles}).
+    \item \texttt{DEFINE} no admite subconsultas y \texttt{MEASURES} no admite
+    \texttt{COUNT(DISTINCT)}.
+    \item \texttt{WITHIN} limita la duración total de la coincidencia, no el hueco entre
+    elementos.
+    \item \texttt{LAG} no acepta marcas de tiempo con zona; se opera sobre milisegundos.
+    \item Una ventana de sesión sobre una vista de una tabla cuyo tiempo es una columna
+    calculada pierde el atributo de tiempo; se aplica sobre la tabla.
+    \item Una vista que contiene una ventana de sesión con partición de varias columnas no se
+    puede volver a expandir al consultarla; se escribe como subconsulta.
+    \item \texttt{JSON\_OBJECT} inserta como texto los objetos que llegan de una subconsulta;
+    el documento de campaña se compone con \texttt{LISTAGG} y \texttt{CONCAT}.
+    \item Los literales de texto en un \texttt{CASE} se rellenan con espacios hasta la mayor
+    longitud; se convierten explícitamente a \texttt{STRING}.
+\end{itemize}

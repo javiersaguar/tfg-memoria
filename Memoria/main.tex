@@ -87,6 +87,8 @@
 \usepackage[noend]{algpseudocode}
 
 \usepackage{eurosym}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds,babel}
 
 \setlength{\headheight}{32.09pt}
 
@@ -112,7 +114,7 @@
 \renewcommand{\partname}{Parte} 
 \renewcommand{\chaptername}{Capítulo} 
 
-\renewcommand{\appendixname}{Apéndice} 
+\renewcommand{\appendixname}{Anexo} 
 \renewcommand{\figurename}{Figura}
 \renewcommand{\tablename}{Tabla} 
 \renewcommand{\listfigurename}{Índice de figuras} 
@@ -123,15 +125,15 @@
 
 \pagenumbering{gobble} %Quitar numeracion
 
-\null\clearpage % WhitePage
+\clearpage
 
 \input{intro/author.tex}
 
-\null\clearpage % WhitePage
+\clearpage
 
 \input{intro/cover.tex}
 
-\null\clearpage % WhitePage
+\clearpage
 
 
 % Page header and footer
@@ -161,9 +163,9 @@
 \clearpage
 \input{sections/index.tex}
 
-\clearpage\null\newpage
+\clearpage
 \input{sections/glosario.tex}
-\clearpage\null\newpage
+\clearpage
 
 \pagenumbering{arabic}
 
@@ -179,10 +181,6 @@
 
 \input{sections/conclusiones.tex}
 
-\input{sections/aspectos.tex}
-
-\input{sections/presupuesto.tex}
-
 %%%%% ESTILO DEL DOCUMENTO %%%%%%%
 
 
@@ -195,17 +193,25 @@
 
 \Urlmuskip=0mu plus 1mu\relax
 
-\addcontentsline{toc}{chapter}{Bibliografía}
+\phantomsection\addcontentsline{toc}{chapter}{Bibliografía}
 \bibliography{ref.bib}
 \bibliographystyle{ieeetr}
 
-%% Anexos
-\chapter*{Anexos}% If \appendix doesn't insert a \chapter
-\addcontentsline{toc}{chapter}{Anexos}% Print Appendix in ToC
-\setcounter{section}{0}% Reset numbering for sections
-\renewcommand{\thesection}{\Alph{section}}% Adjust section printing (from here onward)
-
-\input{anexos/anexoA.tex}
+%% Anexos (no cuentan para la extensión del cuerpo)
 \clearpage
+\appendix
+\phantomsection\addcontentsline{toc}{chapter}{Anexos}
+% En los anexos, el título lleva delante «Anexo A.», «Anexo B.»...
+\makeatletter
+\renewcommand*\@makechapterhead[1]{
+    {\Huge\bfseries \appendixname~\thechapter. #1\par \nobreak\vskip 60\p@}
+}
+\makeatother
+\input{sections/aspectos.tex}
+\input{sections/presupuesto.tex}
+\input{anexos/esquema_campana.tex}
+\input{anexos/patrones_flink.tex}
+\input{anexos/reproducibilidad.tex}
+\input{anexos/licencias.tex}
 
 \end{document}

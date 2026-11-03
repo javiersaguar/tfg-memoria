@@ -13,6 +13,9 @@ procedimientos (TTP) empleados por adversarios reales, organizados en una matriz
 patrones formados por secuencias de eventos relacionados en el tiempo, en lugar de evaluar
 eventos de forma aislada.
 
+\item[Campaña] Conjunto de alertas y eventos que el sistema reconoce como etapas sucesivas de
+un mismo ataque. Es la salida del Pilar~A.
+
 \item[CTI] \textit{Cyber Threat Intelligence}. Inteligencia de amenazas: información
 contextualizada sobre actores, campañas, herramientas e indicadores de compromiso.
 
@@ -34,6 +37,9 @@ que una vulnerabilidad concreta sea explotada en un plazo determinado.
 \item[Event time] Marca temporal correspondiente al instante en que ocurrió realmente un
 evento, por oposición al \textit{processing time} (instante en que el sistema lo procesa).
 
+\item[Hallazgo] Clase de OCSF (\textit{Detection Finding}) que representa una conclusión del
+sistema de detección. Es el formato en que se emiten las campañas.
+
 \item[IOC] \textit{Indicator of Compromise}. Artefacto observable que evidencia una
 intrusión: una dirección IP, un hash, un dominio o una ruta de fichero.
 
@@ -44,6 +50,9 @@ el reconocimiento inicial hasta la consecución del objetivo.
 gestiona la autenticación y custodia credenciales en memoria; objetivo habitual de las
 técnicas de robo de credenciales.
 
+\item[MATCH\_RECOGNIZE] Construcción del estándar SQL para reconocer patrones de filas
+ordenadas; Flink la emplea como lenguaje de procesamiento de eventos complejos.
+
 \item[MulVAL] \textit{Multihost, multistage Vulnerability Analysis}. Analizador de
 seguridad de red basado en lógica que emplea Datalog para derivar rutas de ataque
 factibles a partir de la configuración y las vulnerabilidades de una red.
@@ -53,6 +62,9 @@ proveedor para la normalización de eventos de seguridad.
 
 \item[Sigma] Formato abierto y agnóstico para expresar reglas de detección sobre registros
 de eventos, convertible a los lenguajes de consulta de distintos SIEM.
+
+\item[Oráculo] Versión de referencia de un patrón, calculada por lotes sobre el corpus completo,
+contra la que se valida la versión en flujo.
 
 \item[SIEM] \textit{Security Information and Event Management}. Plataforma de recolección,
 correlación y análisis centralizado de eventos de seguridad.
@@ -66,9 +78,15 @@ OASIS para representar e intercambiar inteligencia de amenazas de forma estructu
 \item[Sysmon] \textit{System Monitor}. Herramienta de Microsoft que amplía la auditoría
 nativa de Windows con telemetría detallada de procesos, red, ficheros y registro.
 
+\item[Topic] Canal con nombre del bus de eventos en el que los productores publican mensajes y
+del que los consumidores los leen.
+
 \item[TTP] \textit{Tactics, Techniques and Procedures}. Descripción del comportamiento de un
 adversario en tres niveles de abstracción: el objetivo perseguido, el método empleado y su
 implementación concreta.
+
+\item[Ventana de sesión] Ventana temporal que agrupa eventos separados entre sí por menos de un
+hueco dado y se cierra cuando ese hueco se supera.
 
 \item[Watermark] Mecanismo de los sistemas de procesamiento en \textit{streaming} que estima
 el progreso del tiempo de evento, permitiendo decidir cuándo una ventana temporal puede

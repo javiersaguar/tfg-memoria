@@ -1,0 +1,306 @@
+% =============================================================================
+% Estado del TFG para la reunion con la tutora (noviembre 2026)
+% TFG: Plataforma de conciencia cibersituacional
+% Compilar:  make   (o: latexmk -pdf estado-noviembre.tex)
+% =============================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-noshorthands]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[a4paper,margin=2.3cm,headheight=14pt]{geometry}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage[most]{tcolorbox}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,calc,backgrounds}
+\usepackage[hidelinks]{hyperref}
+
+% ---------------------------------------------------------------------------
+% Colores y cajas (los mismos que la guia de octubre)
+% ---------------------------------------------------------------------------
+\definecolor{azul}{HTML}{2C5592}
+\definecolor{azulclaro}{HTML}{D5DFEC}
+\definecolor{verde}{HTML}{22674A}
+\definecolor{verdeclaro}{HTML}{D5E6DC}
+\definecolor{ambar}{HTML}{80561A}
+\definecolor{ambarclaro}{HTML}{EBDFC8}
+\definecolor{violeta}{HTML}{57458C}
+\definecolor{violetaclaro}{HTML}{DFD9EA}
+\definecolor{gris}{HTML}{4F5B6A}
+\definecolor{grisclaro}{HTML}{ECEFF3}
+
+\hypersetup{colorlinks=true,linkcolor=azul,urlcolor=azul}
+
+\tcbset{base/.style={enhanced,breakable,boxrule=0.6pt,arc=2pt,left=7pt,right=7pt,top=5pt,bottom=5pt,fonttitle=\bfseries\small}}
+\newtcolorbox{clave}[1][Idea clave]{base,colback=azulclaro!45,colframe=azul,title={#1}}
+\newtcolorbox{dato}[1][Resultado]{base,colback=verdeclaro!55,colframe=verde,title={#1}}
+\newtcolorbox{pendiente}[1][Pendiente]{base,colback=ambarclaro!50,colframe=ambar,title={#1}}
+\newtcolorbox{duda}[1][Dudas]{base,unbreakable,colback=violetaclaro!55,colframe=violeta,title={#1}}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{4pt}
+\setlength{\emergencystretch}{3em}
+
+\titleformat{\section}{\Large\bfseries\color{azul}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries\color{gris}}{\thesubsection}{0.6em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{gris}TFG · Plataforma de conciencia cibersituacional}
+\fancyhead[R]{\small\color{gris}Preparación de la reunión · noviembre de 2026}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+
+\newcommand{\cod}[1]{\texttt{\small #1}}
+
+\begin{document}
+
+% ---------------------------------------------------------------------------
+% Portada breve
+% ---------------------------------------------------------------------------
+\begin{center}
+  {\LARGE\bfseries\color{azul} Plataforma de conciencia cibersituacional}\\[4pt]
+  {\large Preparación de la reunión con la tutora}\\[10pt]
+  {\normalsize Javier Saguar Antona · Grado en Ingeniería y Sistemas de Datos · ETSIT-UPM}\\[2pt]
+  {\normalsize Tutora: Carmen Sánchez-Zas (RSTI, DIT)}\\[2pt]
+  {\small\color{gris} Noviembre de 2026 · documento de uso personal}
+\end{center}
+
+Guía para preparar la reunión de noviembre. En la del 26 de octubre presenté la idea y el boceto del portal y el TFG
+quedó aceptado; ahora toca enseñar el avance, oír su opinión y cerrar las dudas de fechas y trámites. A Carmen solo le
+envío el resumen de una página; aquí está el detalle técnico por si pregunta, el guion y las respuestas preparadas.
+
+\begin{clave}[Guion de la reunión (unos 30 minutos)]
+\begin{enumerate}[leftmargin=*,itemsep=1pt]
+  \item \textbf{Contexto, 2 min.} Recordar el objetivo en una frase y el plan por fases.
+  \item \textbf{Avance, 10 min.} Fases 0 a 3 apoyándome en el resumen de una página. Cifras clave: 96\,\% de
+        eventos normalizados, 2.093 reglas, 7 de 7 variantes de robo de credenciales, orden real de APT29 reproducido,
+        batch y streaming idénticos.
+  \item \textbf{Demo del portal, 5 min} (si hay pantalla): situación, grafo del ataque, línea temporal y mapa.
+        Llevarlo levantado: \cod{docker compose -{}-profile portal up -d}, en \cod{localhost:8090}.
+  \item \textbf{Siguientes fases, 3 min.} F4 a F9 y la regla de recorte si en febrero no está cerrado el núcleo.
+  \item \textbf{Dudas, 10 min.} Título, fechas y créditos (sección 4).
+\end{enumerate}
+\end{clave}
+
+\begin{clave}[El proyecto en tres líneas]
+Una plataforma que recibe telemetría de equipos Windows en tiempo real, la normaliza a un esquema estándar (OCSF),
+detecta técnicas de ataque con reglas Sigma y, sobre esas alertas, reconoce \textbf{ataques de varias etapas} con
+procesamiento de eventos complejos (CEP en Apache Flink). Las campañas resultantes alimentarán un grafo de ataque
+razonado (Pilar B) y una priorización explicable (Pilar C).
+\end{clave}
+
+% ---------------------------------------------------------------------------
+\section{Arquitectura}
+% ---------------------------------------------------------------------------
+
+\begin{center}
+\begin{tikzpicture}[
+  caja/.style={draw=azul,fill=azulclaro!60,rounded corners=2pt,minimum height=11mm,text width=20mm,align=center,font=\footnotesize,inner sep=2pt},
+  hecho/.style={caja,draw=verde,fill=verdeclaro!70},
+  futuro/.style={caja,draw=gris,fill=grisclaro,dashed},
+  topic/.style={font=\scriptsize\ttfamily,text=gris},
+  flecha/.style={-{Stealth[length=2mm]},thick,color=gris},
+  node distance=9mm and 10mm]
+  \node[hecho] (datos) {Datasets\\(OTRF, apt29,\\LSASS)};
+  \node[hecho,right=of datos] (norm) {Normalización\\OCSF};
+  \node[hecho,right=of norm] (sigma) {Detección\\Sigma};
+  \node[hecho,right=of sigma] (cep) {CEP en Flink\\P1 · P2 · P3};
+  \node[hecho,right=of cep] (ch) {ClickHouse\\+ portal};
+  \node[futuro,below=12mm of cep] (grafo) {Grafo razonado\\(F5)};
+  \node[futuro,right=of grafo] (prio) {Priorización\\+ API (F6)};
+  \node[futuro,left=of grafo] (cti) {CTI + TTPs\\(F4)};
+  \draw[flecha] (datos) -- node[above,topic]{raw} (norm);
+  \draw[flecha] (norm) -- node[above,topic]{norm} (sigma);
+  \draw[flecha] (sigma) -- node[above,topic]{det} (cep);
+  \draw[flecha] (cep) -- node[above,topic]{camp.} (ch);
+  \draw[flecha,dashed] (cep) -- (grafo);
+  \draw[flecha,dashed] (cti) -- (grafo);
+  \draw[flecha,dashed] (grafo) -- (prio);
+\end{tikzpicture}
+
+{\small\color{gris} Verde: funcionando. Gris discontinuo: siguientes fases. Las piezas se comunican por un bus de
+eventos (Redpanda, compatible con Kafka).}
+\end{center}
+
+% ---------------------------------------------------------------------------
+\section{Lo que está hecho}
+% ---------------------------------------------------------------------------
+
+\subsection{Fases 0 a 2: datos, normalización y detección (cerradas en julio)}
+\begin{itemize}[leftmargin=*,itemsep=2pt]
+  \item \textbf{Infraestructura} en un solo equipo con contenedores: bus de eventos, Flink 2.2.1, ClickHouse,
+        Prometheus y Grafana.
+  \item \textbf{Normalización a OCSF} de unos 20 tipos de evento de Windows (Sysmon, Security, PowerShell). En el
+        corpus de evaluación: 550.494 eventos, 530.401 normalizados (96,4\,\%); el resto va a una cola de errores con
+        su motivo, nunca se descarta en silencio.
+  \item \textbf{Detección con Sigma}: 2.093 reglas traducidas con una \emph{pipeline} propia a OCSF. El corpus produce
+        1.184 alertas; el día 1 de APT29 (MITRE Evals), 741.
+  \item \textbf{ML-1, anomalías}: Isolation Forest sobre ventanas por host, AUC-ROC 0,995 frente a 0,941 de un
+        control que solo usa el volumen.
+\end{itemize}
+
+\subsection{Fase 3: detección de ataques de varias etapas (en curso, casi cerrada)}
+Cada patrón se implementa dos veces: una versión de referencia en ClickHouse (SQL por lotes) y la versión en
+Flink con \cod{MATCH\_RECOGNIZE}, que debe reproducirla.
+
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{@{}l X X@{}}
+\toprule
+\textbf{Patrón} & \textbf{Qué reconoce} & \textbf{Resultado} \\
+\midrule
+P1 Robo de credenciales & Herramienta → acceso a LSASS → volcado → limpieza & \textbf{7 de 7} variantes de volcado de
+LSASS (7 herramientas distintas) y 3 campañas en APT29; ratio de reducción de alertas de 0,991 \\
+P2 Movimiento lateral & Conexión a otro equipo → ejecución remota en el destino. \textbf{Cruza equipos} & La campaña
+SCRANTON → NASHUA (WinRM y PsExec): 17 conexiones, todas confirmadas desde los dos extremos \\
+P3 Descubrimiento y escalada & Escalada de privilegios con descubrimiento o persistencia & 3 campañas; en APT29
+reproduce el orden exacto del plan del atacante (escalada → descubrimiento → persistencia) \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\begin{dato}[Lo conseguido en las últimas semanas]
+\begin{itemize}[leftmargin=*,itemsep=1pt]
+  \item Los tres patrones en Flink dan \textbf{exactamente} lo mismo que su versión de referencia, también
+        \textbf{en modo streaming} (con marcas de agua y ventanas de sesión), no solo por lotes.
+  \item Las campañas se emiten en un \textbf{esquema común}: un hallazgo estándar OCSF «Detection Finding» con sus
+        etapas ordenadas y la confianza descompuesta en factores explicables. Hay 15 campañas guardadas (11 de P1,
+        1 de P2 y 3 de P3).
+\end{itemize}
+\end{dato}
+
+\subsection{Hallazgos que irán a la memoria}
+\begin{itemize}[leftmargin=*,itemsep=2pt]
+  \item \textbf{La secuencia filtra el ruido que cada señal sola no puede.} Hay mucho reconocimiento legítimo (el
+        agente de Azure ejecuta \cod{route}, \cod{ipconfig} y \cod{arp}; un script de monitorización consulta el
+        directorio cada 15 minutos), pero sin escalada no se forma campaña.
+  \item \textbf{La hora importa.} El conjunto APT29 trae la hora de recogida, no la del evento (hasta 101\,s de
+        desfase). Corregirla cambia el orden de los pasos: con la hora real, la conexión precede a la ejecución remota,
+        como debe ser.
+  \item \textbf{Límites del CEP declarativo.} Flink no puede expresar «agrupa hasta que se abra un hueco» en un solo
+        patrón, lo que obliga a una correlación en dos niveles: el patrón reconoce cada transición y una agregación la
+        convierte en campaña.
+  \item \textbf{Streaming realista.} Medido el desorden de llegada de las alertas: con detección en paralelo hace falta
+        una marca de agua de unos 5 minutos para no perder ninguna, aunque esa cifra está inflada por reproducir el corpus mucho más rápido que el tiempo real.
+\end{itemize}
+
+\subsection{Extra: portal web (F8)}
+Un portal en React para la demostración: situación general, grafo del ataque paso a paso, línea temporal, matriz
+ATT\&CK, incidentes, un asistente que \emph{recomienda} (nunca ejecuta) acciones de respuesta y un mapa mundial
+ilustrativo. Se sirve en un contenedor. Hoy funciona con datos exportados del corpus, a la espera de la API (F6).
+
+\begin{pendiente}[Para cerrar la fase 3]
+\begin{itemize}[leftmargin=*,itemsep=1pt]
+  \item Medir los \textbf{falsos positivos} sobre la parte benigna del corpus y sobre capturas de una sola táctica.
+  \item Medir la \textbf{reducción de alertas} de los tres patrones (hoy solo está medida la de P1).
+  \item Decidir cuánto contexto absorbe una campaña: la versión en Flink la acota a su evidencia y la de referencia
+        absorbe $\pm$10 minutos; afecta a la métrica de reducción.
+  \item Validar sobre el día 2 de APT29, que aún no está cargado.
+\end{itemize}
+\end{pendiente}
+
+% ---------------------------------------------------------------------------
+\section{Siguientes fases}
+% ---------------------------------------------------------------------------
+\begin{description}[leftmargin=0pt,itemsep=3pt,font=\bfseries\color{azul}]
+  \item[F4 · Inteligencia de amenazas y extracción de TTPs (dic.).] Cargar ATT\&CK y fuentes de CTI, y afinar un
+        modelo pequeño de lenguaje (tipo SecureBERT) que extraiga técnicas de informes en texto libre, comparado
+        con su versión sin afinar.
+  \item[F5 · Pilar B, grafo de ataque razonado (feb.).] Llevar campañas, activos y vulnerabilidades a un grafo
+        (Neo4j) y derivar rutas de ataque con reglas Datalog; un modelo sobre el grafo propone conexiones que el
+        razonador verifica.
+  \item[F6 · Pilar C, priorización explicable (mar.).] Puntuar cada incidente con factores descompuestos y explicables,
+        ajustar los pesos con datos y exponerlo todo en una API.
+  \item[F7 · Evaluación (abr.).] Precisión, falsos positivos, reducción de alertas y latencia de detección, frente a
+        líneas base sencillas y para cada componente de aprendizaje.
+  \item[F8 · Portal (abr.–may.).] Conectar el portal ya construido a la API real.
+  \item[F9 · Despliegue, memoria y defensa (may.–jun.).] Empaquetar la plataforma, cerrar la memoria y preparar la
+        defensa.
+\end{description}
+
+{\small\color{gris} Línea de ampliación condicionada (solo si el núcleo está cerrado el 28 de febrero): fuentes de
+Linux, más familias de ataque y simulaciones propias en laboratorio aislado.}
+
+% ---------------------------------------------------------------------------
+\section{Calendario y dudas}
+% ---------------------------------------------------------------------------
+\begin{center}
+\small
+\begin{tabular}{@{}l l@{}}
+\toprule
+\textbf{Fecha} & \textbf{Hito} \\
+\midrule
+30 nov. 2026 & Fase 3 cerrada y fase 4 en marcha \\
+28 feb. 2027 & Núcleo defendible: fase 3 y razonamiento de la fase 5 \\
+18 mar. 2027 & \textbf{Fecha límite para inscribir el TFG} (acordada el 26 de octubre; confirmar) \\
+30 abr. 2027 & Evaluación con resultados y el 60\,\% de la memoria \\
+13 may. 2027 & \textbf{Título definitivo} (acordado el 26 de octubre; confirmar) \\
+15 may. 2027 & Memoria completa para revisión \\
+jun. 2027 & Depósito y defensa \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+{\small\color{gris} Memoria: la normativa de GISD parece limitar el cuerpo a 60 páginas (sin índices, resúmenes,
+glosario, bibliografía ni anexos). No he podido abrir el PDF oficial; conviene confirmarlo.}
+
+\begin{duda}[Dudas para la reunión (las del correo)]
+\begin{enumerate}[leftmargin=*,itemsep=3pt]
+  \item \textbf{Título provisional.} El que he planteado: \emph{Plataforma de conciencia cibersituacional: detección
+        de ataques multi-etapa, grafo de ataque razonado y priorización explicable de incidentes}. Preguntar si le
+        parece adecuado, si es demasiado largo y si habrá que darlo también en inglés. Alternativas por si lo ve largo:
+        \begin{itemize}[leftmargin=*,itemsep=0pt,topsep=1pt]
+          \item \emph{Detección de ataques multi-etapa y priorización explicable de incidentes para la conciencia
+                cibersituacional}.
+          \item \emph{Conciencia cibersituacional en tiempo real: correlación de ataques multi-etapa y grafo de ataque
+                razonado}.
+        \end{itemize}
+  \item \textbf{Fechas.} Confirmar las cerradas el 26 de octubre: \textbf{18 de marzo} como límite para inscribir el
+        TFG y \textbf{13 de mayo} para el nombre definitivo. Preguntar también por el depósito y la solicitud de
+        defensa de la convocatoria de junio.
+  \item \textbf{Créditos y trámites.} En el segundo cuatrimestre estoy matriculado de 33 créditos (prácticas, TFG y
+        alguna asignatura). Para solicitar la defensa hacen falta 210 créditos superados: ¿cuándo se incorporan al
+        expediente los créditos del segundo cuatrimestre (sobre todo las prácticas), y llegan a tiempo para defender en
+        junio? Si no llegan, ¿la alternativa es julio? ¿Hay que pedir algo a Secretaría?
+\end{enumerate}
+\end{duda}
+
+\begin{duda}[Si sobra tiempo]
+\begin{itemize}[leftmargin=*,itemsep=1pt]
+  \item \textbf{Memoria}: cuándo y cómo prefiere recibir capítulos (por ejemplo, estado del arte y diseño antes de enero).
+  \item \textbf{Seguimiento}: una reunión al mes, ¿le encaja?
+  \item \textbf{Prácticas de febrero a mayo}: por eso el plan cierra el núcleo en febrero. ¿Le parece realista?
+\end{itemize}
+\end{duda}
+
+\begin{clave}[Preguntas que puede hacerme y respuesta corta]
+\begin{description}[leftmargin=0pt,itemsep=2pt,font=\bfseries\color{azul}]
+  \item[¿Por qué Flink y no Spark?] Flink procesa evento a evento con estado y trae \cod{MATCH\_RECOGNIZE} para
+        secuencias; Spark trabaja en micro-lotes, con más latencia y sin CEP nativo.
+  \item[¿Cómo sabes que detecta bien?] Cada patrón tiene una versión de referencia en ClickHouse y la de Flink debe
+        reproducirla exactamente. La verdad conocida sale del plan publicado de APT29 y de capturas atómicas: 7 de 7
+        variantes de robo de credenciales. Lo siguiente es medir los falsos positivos.
+  \item[¿Por qué datos públicos y no reales?] Por privacidad, por reproducibilidad y porque traen la verdad conocida.
+        El laboratorio propio los complementa con ataques controlados.
+  \item[¿Qué aporta frente a un SIEM?] Correlación multi-etapa explicable, un grafo de ataque razonado y una
+        priorización con factores descompuestos, todo abierto y reproducible en un solo equipo.
+  \item[¿Dónde está el aprendizaje automático?] Hay cuatro componentes: anomalías (ya hecho, AUC 0,995 frente a 0,941 del
+        control), extracción de técnicas de informes (F4), grafo (F5) y pesos de la priorización (F6).
+  \item[¿Y si no da tiempo?] El núcleo mínimo es pilares A y B más la evaluación. Se recorta en este orden: pesos
+        aprendidos, anomalías, grafo con ML y extracción de técnicas. La ampliación FA solo se hace si en febrero todo
+        está cerrado.
+  \item[¿Por qué un portal si no es el núcleo?] Es el escaparate para la defensa. Va aparte y no ha frenado el
+        pipeline.
+\end{description}
+\end{clave}
+
+\end{document}

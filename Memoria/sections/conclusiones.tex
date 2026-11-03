@@ -1,19 +1,36 @@
 \chapter{Conclusiones y trabajo futuro}
 \label{cap:conclusiones}
 
-% ============================================================================
-% Este capítulo se redactará al cierre del desarrollo.
-% ============================================================================
+Las conclusiones y las limitaciones se redactarán al cierre del desarrollo, cuando pueda
+valorarse el grado de cumplimiento de cada objetivo específico. Las líneas de trabajo futuro
+identificadas hasta ahora se recogen a continuación.
 
-\section{Conclusiones}
+% Secciones ocultas hasta el cierre del desarrollo:
+% \section{Conclusiones}
 % TODO: grado de cumplimiento de cada objetivo específico planteado en la introducción;
 % contribuciones efectivamente aportadas; lecciones aprendidas del desarrollo.
-
-\section{Limitaciones}
+% \section{Limitaciones}
 % TODO: alcance de la validación, dependencia de los conjuntos de datos empleados,
 % aspectos no cubiertos por el prototipo.
 
 \section{Líneas de trabajo futuro}
-% TODO: extensión del razonamiento a la cadena de suministro de software; generación
-% asistida de hechos del grafo a partir de informes; predicción de enlaces sobre el grafo;
-% validación en un entorno de producción real.
+
+\begin{itemize}
+    \item \textbf{Ampliación de la detección.} Incorporar telemetría de red ya disponible en
+    los conjuntos de datos, fuentes de Linux, nuevas familias de ataque y simulaciones propias
+    de campañas completas en el laboratorio aislado. Además de ampliar la cobertura, mostraría
+    que la arquitectura generaliza: una fuente nueva solo requiere un mapeador al esquema OCSF
+    y sus reglas. Esta línea está planificada como ampliación condicionada a que el núcleo del
+    trabajo esté cerrado a finales de febrero.
+    \item \textbf{Señuelos.} Desplegar credenciales y recursos señuelo en la red real, con una
+    tasa de falsos positivos casi nula. Una credencial señuelo empleada tras un volcado de LSASS
+    reforzaría el patrón de robo de credenciales. Los señuelos expuestos a Internet muestran
+    atacantes oportunistas y no cómo se atacaría una organización concreta, que es lo que
+    aporta el análisis de rutas, y los de alta interacción plantean riesgos técnicos y legales.
+    \item \textbf{Cadena de suministro de software}: extender el razonamiento sobre rutas de
+    ataque a las dependencias del software desplegado.
+    \item \textbf{Generación asistida del grafo}: obtener hechos del grafo de ataque a partir
+    de informes en lenguaje natural.
+    \item \textbf{Validación en producción}: evaluar el sistema sobre telemetría real de una
+    organización, con su volumen y su actividad legítima de fondo.
+\end{itemize}

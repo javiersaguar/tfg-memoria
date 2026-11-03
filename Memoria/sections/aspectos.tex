@@ -6,7 +6,7 @@
 Un sistema de detección de intrusiones opera necesariamente sobre registros de la actividad
 de personas y sistemas, y produce salidas que orientan decisiones con consecuencias
 operativas. Ambas circunstancias exigen una reflexión explícita sobre las implicaciones
-éticas y legales del trabajo, que se aborda en este capítulo.
+éticas y legales del trabajo, que se aborda en este anexo.
 
 \section{Protección de datos personales}
 
@@ -86,8 +86,12 @@ empleados se distribuyen bajo licencias que permiten su uso con fines de investi
 bases de conocimiento y formatos utilizados —MITRE ATT\&CK, OCSF, STIX, Sigma— son recursos
 abiertos publicados para su adopción por la comunidad.
 
-% TODO: completar con la tabla de licencias concreta de cada componente y dataset empleado
-% al cierre del desarrollo.
+El Anexo~\ref{anx:licencias} detalla la licencia de cada componente, conjunto de datos y
+base de conocimiento. Dos casos merecen mención: el bus de eventos se distribuye bajo una
+licencia de código fuente disponible que permite su uso gratuito salvo para ofrecerlo como
+servicio comercial, y el modelo de lenguaje previsto para la extracción de técnicas se
+publica bajo una licencia abierta con restricciones de uso responsable, compatibles con la
+finalidad defensiva del trabajo.
 
 \section{Impacto social y económico}
 
@@ -110,8 +114,8 @@ de diseño adoptadas por motivos de eficiencia operativa tienen también efecto 
 la selección de componentes de bajo consumo de recursos, la organización del despliegue en
 perfiles que evitan mantener servicios activos innecesariamente, la aplicación de
 codificaciones de compresión específicas por columna en el almacén analítico, y la
-restricción explícita del aprendizaje automático a modos de inferencia sobre modelos
-pequeños, descartando el entrenamiento de modelos de gran tamaño.
+restricción del aprendizaje automático a modelos pequeños entrenados en la propia estación
+de trabajo, descartando el entrenamiento de modelos de gran tamaño.
 
 Esta última decisión, adoptada inicialmente por limitación de recursos, resulta relevante
 también desde esta perspectiva: el coste energético del entrenamiento de modelos grandes es
