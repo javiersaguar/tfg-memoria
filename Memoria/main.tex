@@ -100,9 +100,15 @@
 \titleformat{\chapter}[display]
 {\normalfont\bfseries}{}{0pt}{\Huge}
 
+% Títulos de capítulo pegados a la cabecera, sin el hueco por defecto (50 pt
+% arriba y una línea vacía para el número). Igual con número y sin él (Índice,
+% listados, Resumen, Glosario, Bibliografía).
 \makeatletter
     \renewcommand*\@makechapterhead[1]{
-        {\Huge\bfseries #1\par \nobreak\vskip 60\p@}
+        {\Huge\bfseries #1\par \nobreak\vskip 24\p@}
+    }
+    \renewcommand*\@makeschapterhead[1]{
+        {\Huge\bfseries #1\par \nobreak\vskip 24\p@}
     }
 \makeatother
  
@@ -204,7 +210,7 @@
 % En los anexos, el título lleva delante «Anexo A.», «Anexo B.»...
 \makeatletter
 \renewcommand*\@makechapterhead[1]{
-    {\Huge\bfseries \appendixname~\thechapter. #1\par \nobreak\vskip 60\p@}
+    {\Huge\bfseries \appendixname~\thechapter. #1\par \nobreak\vskip 24\p@}
 }
 \makeatother
 \input{sections/aspectos.tex}

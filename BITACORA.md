@@ -1176,3 +1176,23 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - `Memoria/sections/{desarrollo,pilarA,resultados,conclusiones,presupuesto,aspectos,glosario,introduccion}.tex`;
   - `Memoria/anexos/{esquema_campana,patrones_flink,reproducibilidad,licencias}.tex`;
   - `Memoria/anexos/anexoA.tex`, eliminado: era la plantilla vacía.
+
+### 2026-11-04 — Fase FA ampliada: datasets externos y DoS/DDoS
+- **Con qué/quién:** Claude Code, sobre una propuesta de datasets y de detección de DoS/DDoS de otro agente.
+- **Hecho:** reescrita la fase FA del ROADMAP:
+  - FA.0, versionar el laboratorio;
+  - FA.1, Zeek de APT29 unido a P2;
+  - FA.2, day2;
+  - FA.3, COMISET como validación externa en Windows;
+  - FA.4, Linux con CAM-LDS v2, Splunk Attack Data, AttackMate, Log4Shell y AIT LDS v2;
+  - FA.5, piloto de DoS/DDoS con Orion 2026, CICDDoS2019 y k6 en el laboratorio;
+  - FA.6, más familias de ataque;
+  - FA.7, datos propios con controles negativos y verdad conocida por paso.
+
+  macOS, IoT-23 y DARPA TC pasan a §3.4 como trabajo relacionado.
+- **Decisiones:**
+  - Sigue siendo **condicionada** al 28-02-2027.
+  - Tramo mínimo realista: FA.1, FA.2, una muestra de COMISET y el escenario 1 de CAM-LDS como prueba de que P3 generaliza a Linux (su ancla `T1548` ya cubre el abuso de sudo, `T1548.003`).
+  - DoS/DDoS no es un patrón de secuencia: es un detector por ventanas que emite un hallazgo por episodio con el esquema común, separando el patrón de tráfico del impacto observado.
+- **Pendiente:** la descarga de los datasets la hará el otro agente en `data/external/` con su `MANIFEST.md`. Ningún conjunto externo está verificado todavía.
+- **Archivos tocados:** `docs/ROADMAP.md` (FA y §3.4).
