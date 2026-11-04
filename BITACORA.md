@@ -1196,3 +1196,33 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - DoS/DDoS no es un patrón de secuencia: es un detector por ventanas que emite un hallazgo por episodio con el esquema común, separando el patrón de tráfico del impacto observado.
 - **Pendiente:** la descarga de los datasets la hará el otro agente en `data/external/` con su `MANIFEST.md`. Ningún conjunto externo está verificado todavía.
 - **Archivos tocados:** `docs/ROADMAP.md` (FA y §3.4).
+
+### 2026-11-04 (2) — Datasets externos de la fase FA descargados
+- **Con qué/quién:** otro agente (descarga e inventario); Claude Code (comprobación del inventario y esta entrada).
+- **Hecho:** descargados y catalogados en `tfg-ciberconciencia/data/external/` (5,4 GB). Inventario en `data/external/MANIFEST.md`, con URL oficial, licencia literal, tamaño, SHA-256 y fase de cada fichero. No se usaron espejos.
+
+  | Dataset | Qué hay | Fase | Uso previsto |
+  |---|---|---|---|
+  | COMISET LAB | ZIP de 4,91 GB | FA.3 | Validación externa de la detección en Windows. Se filtrará una muestra en streaming para no expandir el JSON entero |
+  | CAM-LDS v2 | Dos campañas Linux con sus manifiestos | FA.4 | Explotación web → sudo → persistencia por SSH. El segundo escenario se reserva para evaluar sin reajustar reglas |
+  | AttackMate Evaluation Data | 4 ZIP: lateral por SSH y tres variantes de escalada | FA.4 | Si se detecta el mismo comportamiento cuando cambia la herramienta |
+  | AIT Alert Data Set | Alertas y ventanas etiquetadas (96,2 MB) | FA.4 | Probar el correlador de Flink con alertas externas (Wazuh, Suricata, AMiner), como experimento aparte de Sigma |
+  | Splunk auditd cron | Log y YAML, T1053.003 | FA.4 | Mapeo a OCSF y regla de cambios de cron |
+  | Splunk macOS Gatekeeper | Log de osquery y YAML, T1553.001 | §3.4 | Primera fuente macOS, más adelante |
+
+  OTRF ya estaba clonado. Solo se comprobó y registró:
+  - APT29: Zeek `conn`/`dns` de los dos días y logs de host de day2;
+  - Log4Shell: Auditd/AUOMS y PCAP;
+  - GoldenSAML: Windows, Azure AD y Microsoft 365.
+- **No descargado:**
+  - **Orion 2026**: los dos ZIP oficiales devuelven HTTP 403, y solo se guardó la ficha y la licencia;
+  - **CICDDoS2019**: sin acceso a la descarga oficial;
+  - **AIT LDS v2 crudo y la parte benigna de COMISET**: pendientes de OK;
+  - **IoT-23 y DARPA TC**: solo registrados.
+- **Primer uso acordado: el replay del globo del portal con el Zeek de APT29**, mientras Orion no esté accesible. Con Orion, comparar un día benigno con un DDoS de muchos a uno.
+  - **Ojo:** las IP de APT29 son privadas. Las sedes del globo serán **ilustrativas** y estables por escenario, con su chip «ilustrativo», como decide §2: el portal no geolocaliza IP privadas ni presenta como documentado lo que no lo es.
+- **Problemas / pendiente:**
+  - `data/` no se versiona, así que `MANIFEST.md` solo existe en disco. Conviene copiarlo a `docs/` para no perder la procedencia y las sumas si se borra `data/`.
+  - Ningún conjunto está verificado aún contra el normalizador (canales, etiquetado).
+  - Todo sigue condicionado al 28-02-2027.
+- **Archivos tocados:** `tfg-ciberconciencia/data/external/` (fuera de git).
