@@ -1326,3 +1326,27 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
     - `Memoria/sections/resultados.tex` y `Memoria/main.tex`.
 
     El cuerpo de la memoria pasa de 46 a unas 51 páginas.
+
+### 2026-11-06 (2) — F4 replanificada antes de empezar
+- **Con qué/quién:** Javier (decisiones); Claude Code (análisis y redacción del ROADMAP).
+- **Decisiones:**
+  - **Orden:** empezar F4 y no ampliar el corpus con los datos externos descargados.
+    - El punto de control del 28-02-2027 pide F5 en su parte simbólica.
+    - Más datos no cambian las cifras de F3.
+    - Cada conjunto externo exige su propio mapeador.
+    - Excepción: apt29 day2, en el mismo formato que el día 1, se carga al empezar F5 porque el grafo lo necesita.
+  - **ML-2 conectado al proyecto** por el vocabulario común de los identificadores de ATT&CK:
+    - ATT&CK oficial y versionado como referencia única, con un servicio que traduce los identificadores obsoletos;
+    - la salida es un perfil de técnicas por informe y por actor, en STIX, que consumen F5 (siguiente etapa) y F6 (`w5·confianza_CTI`);
+    - evaluación intrínseca (F1 en AnnoCTR, separando por informe) y extrínseca sobre el corpus: cobertura del perfil de APT29 frente a ATT&CK y frente a lo detectado, y parecido campaña–actor;
+    - la circularidad se declara: los perfiles de ATT&CK y el plan de MITRE salen de los mismos informes.
+  - **OpenCTI frente al plan B: se hacen los dos.** El plan B va primero porque desbloquea F5, y OpenCTI después con los mismos datos y el mismo cargador STIX → Neo4j. Se comparan con criterios fijados antes de medir: coste, ingesta, fidelidad, valor añadido y encaje con ML-2.
+    - OpenCTI no usa Neo4j, así que el cargador hace falta en ambos casos.
+    - Solo funciones de la edición Community.
+    - Su conector de importación de documentos, si sirve, será la línea base de diccionario de ML-2.
+- **Recursos comprobados:** 44 GB de RAM para WSL, 24 núcleos y 731 GB libres. El stack actual usa unos 6 GB.
+- **Archivos tocados:** `tfg-ciberconciencia/docs/ROADMAP.md`, en su revisión 5:
+  - F4 reescrita como F4.1 (plan B), F4.2 (OpenCTI y comparativa) y F4.3 (ML-2);
+  - DoD con 7 puntos y riesgos propios;
+  - Neo4j adelantado desde F5.1;
+  - referencias ajustadas en F5, F6, F7, F9 y R3.
