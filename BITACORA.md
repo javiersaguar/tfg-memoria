@@ -1405,3 +1405,41 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
     - `cti/feeds/{__init__.py,threatfox.py,test_threatfox.py,threatfox_attack.cypher}`
     - `docs/ROADMAP.md`
   - `tfg-memoria/`: esta entrada.
+
+### 2026-11-06 (4) — F4.2: OpenCTI levantado y primera comparativa con el plan B
+- **Con qué/quién:** Javier (levantar, vigilar la ingesta y explorar Neo4j); Claude Code (perfil `cti`, exportador, comparador, medición y esta entrada).
+- **Hecho:**
+  - **OpenCTI en el compose** (perfil `cti`): 7.261023.1, edición **Community**.
+    - Dependencias fijadas: Elasticsearch 8.19.21 con 4 GB, Redis, RabbitMQ y MinIO (Silo).
+    - 2 workers y los conectores de MITRE, exportación STIX, importación STIX e importación de documentos.
+    - Solo publica `localhost:8082`.
+    - Secretos en `infra/.env`, con generador y plantilla versionados.
+  - **Trampa:** la primera versión elegida, 7.260811.0-**lts**.1, es la edición LTS de Filigran y pide una licencia propia. Se cambió a la Community, borrando solo sus cuatro volúmenes y sin usar `down -v`, que habría borrado ClickHouse y Neo4j.
+  - **Ingesta de ATT&CK v19.2** en OpenCTI: 22.600 objetos en **32 min 10 s**, frente a **4,7 s** del cargador propio.
+  - **Coste:** unos 7,4 GB de RAM solo con ATT&CK, de ellos 6,0 GB de Elasticsearch; Neo4j usa 3,6 GB con ATT&CK y ThreatFox. Son 11 servicios frente a 1.
+  - **Fidelidad**, con `cti/comparativa/opencti_export.py` (exporta por la API `toStix`) y `cti/comparativa/fidelidad.py`:
+    - OpenCTI **descarta las 149 técnicas revocadas y las 157 relaciones `revoked-by`**;
+    - **fusiona entidades que comparten alias**: Ember Bear + Saint Bear, Lotus Blossom + Thrip, y dos parejas de malware;
+    - **no importa las estrategias de detección ni las analíticas de ATT&CK v18+** (2.457 objetos);
+    - pierde la versión y la marca de obsoleta de cada técnica;
+    - conserva todas las `uses`, `mitigates` y `attributed-to`, y las tácticas y plataformas;
+    - **reescribe los ids STIX** con su propio uuid5 y guarda los de MITRE en una extensión. Por eso la fidelidad se compara paquete contra paquete y no en una segunda base Neo4j.
+- **Análisis de las pérdidas** (pregunta de Javier: ¿se pueden evitar?):
+  - **No hace falta evitarlas si cada herramienta tiene su papel.** El ATT&CK de referencia es el paquete oficial, que carga el plan B y lee `cti/attack_ids.py`, así que no depende de OpenCTI.
+  - Si OpenCTI queda como interfaz del analista, se pueden añadir los identificadores antiguos como alias de la técnica vigente. Por ejemplo, `T1059.001` tendría el alias `T1086` y se podría buscar por él.
+  - Las fusiones por alias son de diseño de OpenCTI: no se tocan los datos de MITRE para evitarlas. Se documentan, y el parecido campaña–actor de ML-2 se calcula sobre el catálogo del plan B.
+  - Las analíticas de v18+ no son críticas, porque la detección del proyecto es Sigma.
+- **Pendiente (próxima sesión):**
+  - valor añadido con una muestra de 10.000 IOCs de ThreatFox (el feed completo serían unas 6 h a 12 objetos/s);
+  - encaje con ML-2: 2–3 informes de Microsoft por el conector de documentos, que es a la vez la LB-a;
+  - decisión documentada de F4.2;
+  - de F4.1: `verdad_conocida.py` con el servicio de normalización, y las licencias de ATT&CK y ThreatFox en el anexo.
+- **Archivos tocados:**
+  - `tfg-ciberconciencia/`:
+    - `infra/docker-compose.yml` (perfil `cti`)
+    - `infra/.env.example`
+    - `infra/opencti/rabbitmq.conf`
+    - `scripts/{up.sh,gen_env_opencti.py}`
+    - `cti/comparativa/{__init__.py,opencti_export.py,fidelidad.py}`
+    - `docs/ROADMAP.md`
+  - `tfg-memoria/`: esta entrada.
