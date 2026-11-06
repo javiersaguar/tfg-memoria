@@ -1260,3 +1260,64 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   2. después, F4 y F5;
   3. Linux y DoS siguen en la ampliación condicionada al 28-02-2027.
 - **Archivos tocados:** `tfg-ciberconciencia/docs/ROADMAP.md` (disponibilidad de datos en FA y F4.2); `documentos/catalogo-datasets.{html,pdf}`; `data/external/` (fuera de git).
+
+### 2026-11-06 — F3 cerrada: reducción de alertas y falsos positivos medidos
+- **Con qué/quién:** Javier (ejecución del pipeline, paso a paso); Claude Code (scripts de evaluación, revisión manual y esta entrada).
+- **Decisiones de Javier:**
+  - **Extensión de la campaña:** solo su evidencia, lo que emite Flink. No se usan los ±10 min del oráculo. Las alertas que no recoge ninguna campaña cuentan como «sueltas».
+  - **Corpus de falsos positivos:** el corpus de F3 más las capturas atómicas de host de OTRF, juzgando cada campaña contra la verdad conocida de su dataset.
+- **Hecho:**
+  - **Preparación:**
+    - `pipeline/load_atomics.py` pasa a cargar solo los ZIP de host, con un ordinal por dataset como identidad de reserva (al 35 % de los eventos le falta RecordNumber).
+    - Excluye la captura de comsvcs, que ya está en el corpus.
+    - `scripts/load_f3_corpus.sh` tiene la opción nueva `--con-atomicos`.
+  - **Verdad conocida:**
+    - `detection/evaluation/verdad_conocida.py` genera `verdad_datasets.csv`, con 110 datasets.
+    - Las fuentes son el plan de APT29, las fichas compuestas de LSASS y las fichas atómicas.
+    - Seis capturas sin ficha quedan como verdad parcial.
+    - Se carga en `tfg.verdad_datasets` (`infra/clickhouse/init/04_verdad.sql`).
+  - **Ejecución `f3f`:**
+    - 1.241.587 eventos consumidos y 1.212.496 normalizados (97,7 %).
+    - 2.740 alertas: el corpus sigue en 1.184 (741 de APT29) y los atómicos aportan 1.556, repartidas en 86 de las 101 capturas.
+    - Flink saca 55 campañas: 32 de P1, 7 de P2 y 16 de P3. Las 15 del corpus son las de siempre.
+  - **Reducción** (`detection/evaluation/f3_cierre.sql`):
+    - 0,859 sobre la evidencia, unas 7 alertas por campaña;
+    - 0,122 global (0,062 en el corpus);
+    - el CEP comprime mucho lo que reconoce, pero solo reconoce el 14 % de las alertas.
+  - **Falsos positivos.** Las 22 candidatas, revisadas una a una en `tfg-ciberconciencia/detection/evaluation/f3_revision_fp.md`:
+    - 6 eran ataque real que el metadato no listaba;
+    - 10 son ataque real leído con el patrón equivocado;
+    - 6 son ruido del sistema operativo;
+    - y 1 campaña de ruido dentro de APT29 que la evaluación por dataset no veía.
+
+    Tras la revisión, en los atómicos:
+
+    | patrón | precisión | exhaustividad |
+    |--------|----------:|--------------:|
+    | P1     |      0,57 |          0,55 |
+    | P2     |      1,00 |          0,17 |
+    | P3     |      0,46 |          0,75 |
+
+    Por campaña, la precisión es de 0,69 (17 falsas de 55).
+  - **Causas:** se concentran en cuatro reglas:
+    - *Potential Credential Dumping Activity Via LSASS* con csrss/wininit;
+    - *Uncommon Process Access Rights For Target Image*, etiquetada como inyección;
+    - *Suspicious SYSTEM User Process Creation*, etiquetada T1003/T1134;
+    - *HackTool - Generic Process Access*.
+- **Limitaciones, para que no se cuelen en la memoria:**
+  - Las capturas atómicas son todas ataques. Esto mide confusión entre patrones, no falsas alarmas sobre actividad limpia.
+  - La revisión es manual y la ha hecho el propio autor. La evidencia de cada caso está en la tabla para que pueda auditarse.
+  - El bajo recall de P2 se debe en buena parte a capturas de un solo equipo: 18 de los 24 fallos.
+- **Pendiente:**
+  - **Ajuste v2** (filtrar csrss/wininit y revisar las etiquetas de esas reglas): se mide aparte y se presenta como antes/después. Las cifras v1 son las oficiales.
+  - **A F7:** la latencia (la reproducción va acelerada), la tasa sobre tráfico benigno y apt29 day2.
+  - Pasar estas cifras a la sección de resultados de la memoria.
+- **Estado:** **F3 cerrada**, con los cinco puntos del DoD cumplidos. Siguientes: F4 y F5.
+- **Archivos tocados:**
+  - `tfg-ciberconciencia/`:
+    - `pipeline/load_atomics.py`
+    - `scripts/load_f3_corpus.sh`
+    - `detection/evaluation/{verdad_conocida.py,verdad_datasets.csv,f3_cierre.sql,f3_revision_fp.md}`
+    - `infra/clickhouse/init/04_verdad.sql`
+    - `docs/ROADMAP.md` (rev. 4)
+  - `tfg-memoria/`: esta entrada.
