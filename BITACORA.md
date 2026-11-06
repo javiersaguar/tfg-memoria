@@ -1311,7 +1311,6 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Pendiente:**
   - **Ajuste v2** (filtrar csrss/wininit y revisar las etiquetas de esas reglas): se mide aparte y se presenta como antes/después. Las cifras v1 son las oficiales.
   - **A F7:** la latencia (la reproducción va acelerada), la tasa sobre tráfico benigno y apt29 day2.
-  - Pasar estas cifras a la sección de resultados de la memoria.
 - **Estado:** **F3 cerrada**, con los cinco puntos del DoD cumplidos. Siguientes: F4 y F5.
 - **Archivos tocados:**
   - `tfg-ciberconciencia/`:
@@ -1320,4 +1319,10 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
     - `detection/evaluation/{verdad_conocida.py,verdad_datasets.csv,f3_cierre.sql,f3_revision_fp.md}`
     - `infra/clickhouse/init/04_verdad.sql`
     - `docs/ROADMAP.md` (rev. 4)
-  - `tfg-memoria/`: esta entrada.
+  - `tfg-memoria/`:
+    - esta entrada;
+    - `Memoria/sections/pilarA.tex` (nueva subsección «Evaluación de la fase» y estado: cerrada);
+    - `Memoria/anexos/revision_fp.tex` (nuevo Anexo E, con los 22 casos);
+    - `Memoria/sections/resultados.tex` y `Memoria/main.tex`.
+
+    El cuerpo de la memoria pasa de 46 a unas 51 páginas.

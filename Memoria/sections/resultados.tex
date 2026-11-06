@@ -4,7 +4,8 @@
 Este capítulo recogerá la evaluación cuantitativa del sistema completo, que se realizará en
 la fase de evaluación una vez construidos los tres pilares. Los resultados parciales obtenidos
 hasta ahora en cada componente se presentan junto a su desarrollo en el
-Capítulo~\ref{cap:desarrollo}. El protocolo se fija \textbf{antes} de ejecutar los
+Capítulo~\ref{cap:desarrollo}; en particular, la reducción de alertas y los falsos positivos
+del Pilar~A se miden en la Sección~\ref{sec:pilarA-evaluacion}. El protocolo se fija \textbf{antes} de ejecutar los
 experimentos, para evitar el sesgo de elegir las métricas una vez conocidos los resultados.
 
 \section{Protocolo de evaluación}
@@ -13,8 +14,8 @@ experimentos, para evitar el sesgo de elegir las métricas una vez conocidos los
 
 La evaluación empleará conjuntos de datos públicos cuya actividad maliciosa está documentada:
 las siete campañas de robo de credenciales, los dos días de la emulación de APT29, capturas de
-explotación de vulnerabilidades y de falsificación de credenciales federadas, y al menos diez
-capturas atómicas de tácticas distintas. La verdad conocida de cada conjunto se consolidará en
+explotación de vulnerabilidades y de falsificación de credenciales federadas, y las capturas
+atómicas de host de OTRF, de las que el Pilar~A ya emplea 101. La verdad conocida de cada conjunto se consolidará en
 metadatos estructurados (técnicas, equipos, ventanas temporales y, cuando exista, el plan de
 emulación), de modo que todas las métricas se calculen contra la misma referencia.
 
@@ -22,7 +23,8 @@ emulación), de modo que todas las métricas se calculen contra la misma referen
 
 \begin{itemize}
     \item \textbf{Detección}: precisión, exhaustividad y F1 por técnica y en conjunto; tasa de
-    falsos positivos sobre la porción benigna; cobertura de ATT\&CK.
+    falsos positivos sobre tráfico benigno etiquetado, que las capturas atómicas no aportan
+    porque son todas maliciosas; cobertura de ATT\&CK.
     \item \textbf{Correlación multi-etapa}: campañas correctamente reconstruidas, completitud
     de sus etapas y ratio de reducción de alertas.
     \item \textbf{Priorización}: presencia del incidente real entre los $K$ primeros,

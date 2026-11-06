@@ -325,23 +325,149 @@ resumen del evento y la regla, y las tablas del almacén deduplican por esa iden
 comprobación final fue recuperar exactamente las 741 alertas documentadas para APT29 y las
 cifras de eventos de cada conjunto de datos contadas contra su fichero de origen.
 
+\subsection{Evaluación de la fase: reducción de alertas y falsos positivos}
+\label{sec:pilarA-evaluacion}
+
+La evaluación de cierre de la fase amplía el corpus con las \textbf{101 capturas atómicas
+de host} de OTRF que no formaban parte de él. Cada una reproduce una técnica concreta y trae
+su ficha con las técnicas de ATT\&CK ejecutadas. Con esas fichas, las de las siete campañas
+y el plan de APT29 se construyó una \textbf{tabla de verdad conocida} de 110 conjuntos de
+datos que indica, para cada uno, qué patrones \emph{deberían} disparar:
+\begin{itemize}
+    \item P1, si la verdad incluye la familia \texttt{T1003};
+    \item P2, si incluye movimiento lateral;
+    \item P3, si incluye escalada junto con descubrimiento o persistencia.
+\end{itemize}
+Seis capturas sin ficha se marcaron como verdad parcial. La ampliación eleva el volumen
+procesado a 1.212.496 eventos normalizados (97,7\,\%) y 2.740 alertas. Las 1.184 alertas y
+las 15 campañas del corpus no cambian, y los tres patrones emiten en total \textbf{55
+campañas}: 32 de P1, 7 de P2 y 16 de P3.
+
+\subsubsection{Ratio de reducción de alertas}
+
+Se decidió que una campaña absorbe \textbf{solo su evidencia}, es decir, las alertas que el
+patrón reconoce como etapas. Quedan fuera las alertas cercanas en el tiempo que el oráculo
+añadía como contexto. Las alertas que ninguna campaña recoge siguen visibles para el
+analista y cuentan como \textbf{sueltas}. Se informan dos cifras:
+\[
+\textit{reducción sobre la evidencia} = 1 - \frac{\text{campañas}}{\text{alertas de evidencia}},
+\qquad
+\textit{reducción global} = 1 - \frac{\text{campañas} + \text{alertas sueltas}}{\text{alertas}}.
+\]
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{|l|r|r|r|r|r|}
+\hline
+\textbf{Grupo} & \textbf{Alertas} & \textbf{En campaña} & \textbf{Campañas} &
+\textbf{Red. evidencia} & \textbf{Red. global} \\
+\hline
+Corpus del Pilar A & 1.184 & 88 & 15 & 0,830 & 0,062 \\
+Capturas atómicas & 1.556 & 302 & 40 & 0,868 & 0,168 \\
+\hline
+\textbf{Total} & \textbf{2.740} & \textbf{390} & \textbf{55} & \textbf{0,859} & \textbf{0,122} \\
+\hline
+\end{tabular}
+\caption{Reducción de alertas del Pilar A. La línea base B1, solo reglas Sigma, tiene
+reducción nula.}
+\label{tab:reduccion-pilarA}
+\end{table}
+
+Por patrón, la reducción sobre la evidencia es de 0,874 en P1, 0,844 en P2 y 0,862 en P3:
+cada campaña condensa entre 6 y 8 alertas. La lectura conjunta de las dos cifras es el
+resultado principal de la fase:
+\begin{itemize}
+    \item El CEP \textbf{comprime unas siete veces} lo que reconoce como ataque.
+    \item Solo reconoce el \textbf{14\,\%} de las alertas.
+\end{itemize}
+El resto queda sin agrupar, en buena parte porque es ruido de una sola etapa, como las
+alertas repetidas del lanzador de PowerShell de APT29. No se compara con la agrupación
+ingenua de la fase anterior (Sección~\ref{sec:deteccion-reglas}): aquella juntaba todas las
+alertas próximas sin afirmar que fueran un ataque, y una campaña sí lo afirma.
+
+\subsubsection{Falsos positivos}
+
+Cada campaña se juzgó contra la verdad conocida de su conjunto de datos. Una campaña de un
+patrón \emph{no esperado} es un \textbf{falso positivo candidato}. La primera medición dio
+22 candidatas, y se revisaron una a una a partir de las reglas y los procesos de su
+evidencia (Anexo~\ref{anx:revision-fp}). Se clasificaron en tres grupos:
+\begin{itemize}
+    \item \textbf{6 eran ataque real que la ficha no lista}, como Mimikatz ejecutándose en
+    una captura documentada solo como inyección de procesos. Pasan a verdaderos positivos.
+    \item \textbf{10 son ataque real leído con el patrón equivocado}. Por ejemplo, la
+    ejecución remota con PsExec se interpreta como robo de credenciales porque la regla que
+    detecta procesos lanzados como SYSTEM lleva la etiqueta \texttt{T1003}.
+    \item \textbf{6 nacen de ruido del sistema operativo}: \texttt{csrss.exe} y
+    \texttt{wininit.exe} abren LSASS con todos los permisos al arrancar, y una regla de
+    permisos de acceso inusuales, etiquetada como inyección, fabrica una etapa de
+    escalada inexistente.
+\end{itemize}
+La revisión destapó además una campaña de P1 en APT29 que la evaluación por conjunto de
+datos no veía. Consta solo de esas dos alertas de arranque, en el mismo milisegundo.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{|l|r|r|r|r|r|r|r|}
+\hline
+\textbf{Patrón} & \textbf{VP} & \textbf{FP} & \textbf{FN} & \textbf{VN} &
+\textbf{Precisión} & \textbf{Exhaustividad} & \textbf{Falsas alarmas} \\
+\hline
+P1 & 12 & 9 & 10 & 70 & 0,57 & 0,55 & 0,11 \\
+P2 & 5 & 0 & 24 & 72 & 1,00 & 0,17 & 0,00 \\
+P3 & 6 & 7 & 2 & 86 & 0,46 & 0,75 & 0,08 \\
+\hline
+\end{tabular}
+\caption{Resultados por patrón sobre las capturas atómicas, por conjunto de datos y tras la
+revisión manual. En el corpus, los tres patrones aciertan en todos los conjuntos.}
+\label{tab:fp-pilarA}
+\end{table}
+
+A nivel de campaña, 17 de las 55 son falsas: 10 por confusión de patrón y 7 por ruido. La
+\textbf{precisión por campaña es de 0,69}. Los errores no se reparten al azar, sino que se
+concentran en \textbf{cuatro reglas} cuya etiqueta ATT\&CK describe la técnica posible y no
+la ocurrida. Como los patrones razonan sobre esas etiquetas, heredan el error.
+
+Los falsos negativos de P2 (24) tienen sobre todo una causa del propio conjunto de
+evaluación. En 18 capturas las alertas caen en un único equipo, porque la captura registra
+solo el destino, y el patrón necesita ver el origen y el destino del movimiento. En P1, los
+casos perdidos son volcados que no tocan el proceso LSASS desde fuera, como DCSync o
+Mimikatz ejecutado en memoria.
+
+Tres límites acotan estas cifras:
+\begin{itemize}
+    \item Las capturas atómicas son todas actividad maliciosa, así que miden sobre todo la
+    \textbf{confusión entre patrones}, no las falsas alarmas sobre actividad legítima. Esa
+    tasa requiere tráfico benigno etiquetado y se medirá en la evaluación final.
+    \item La revisión es manual y la hizo el autor. Por eso el anexo recoge la evidencia de
+    cada caso, para que la clasificación pueda auditarse.
+    \item No se ha medido la \textbf{latencia de detección}: el corpus se reproduce decenas
+    de veces más rápido que el tiempo real y la cifra no tendría significado.
+\end{itemize}
+
 \subsection{Estado de la fase y trabajo pendiente}
 
-Se cumplen los criterios de cierre relativos a la detección: tres patrones que disparan sobre
-datos reales, las siete variantes de robo de credenciales detectadas y campañas multi-etapa
-reconocidas en APT29, con resultados idénticos por lotes y en flujo. Quedan pendientes:
+La fase queda \textbf{cerrada} con sus cinco criterios cumplidos:
+\begin{itemize}
+    \item tres patrones que disparan sobre datos reales;
+    \item las siete variantes de robo de credenciales detectadas;
+    \item campañas multi-etapa reconocidas en APT29, con resultados idénticos por lotes y en
+    flujo;
+    \item la ratio de reducción de alertas medida;
+    \item los falsos positivos cuantificados.
+\end{itemize}
+Quedan como trabajo posterior:
 
 \begin{itemize}
-    \item Medir los \textbf{falsos positivos} sobre la porción benigna del corpus y sobre
-    capturas atómicas de una sola táctica.
-    \item Medir la \textbf{ratio de reducción de alertas} de los tres patrones. La de P1
-    (0,991) no es comparable con la línea base de agrupación de la fase anterior, porque solo
-    cubre lo que P1 absorbe alrededor de sus anclas.
-    \item Decidir la \textbf{extensión de una campaña}: la versión en Flink la acota a su
-    evidencia y el oráculo absorbe $\pm$10 minutos. En P3 la diferencia es grande, porque el
-    descubrimiento llega en ráfagas alrededor del ancla, y condiciona la ratio de reducción.
+    \item Una \textbf{segunda versión de los patrones} que descarte el ruido del sistema
+    operativo y corrija la lectura de las cuatro reglas problemáticas. Se medirá aparte y se
+    presentará frente a las cifras de esta sección, que son las de referencia, para no
+    ajustar los patrones a los mismos datos con que se evalúan.
     \item Resolver el \textbf{punto ciego del etiquetado}: el 27,1\,\% de las alertas no lleva
     técnica ATT\&CK y es invisible para la correlación por construcción.
-    \item Incorporar el segundo día de APT29 y emitir las campañas en flujo hacia un destino
-    que admita actualizaciones.
+    \item En la evaluación final: la latencia de detección, la tasa de falsas alarmas sobre
+    tráfico benigno y el segundo día de APT29.
+    \item Emitir las campañas en flujo hacia un destino que admita actualizaciones y llevar
+    los eventos tardíos a su cola propia.
 \end{itemize}

@@ -1,0 +1,72 @@
+\chapter{Revisión de los falsos positivos del Pilar A}
+\label{anx:revision-fp}
+
+Este anexo recoge la revisión manual de las 22 campañas que la primera medición marcó como
+falsos positivos candidatos (Sección~\ref{sec:pilarA-evaluacion}). Una campaña es candidata
+cuando su patrón no está esperado según la verdad conocida de su conjunto de datos. Cada una
+se clasificó a partir de las reglas y los procesos de su evidencia:
+\begin{itemize}
+    \item \textbf{V}: actividad de ataque real que la ficha de la captura no lista. Pasa a
+    verdadero positivo.
+    \item \textbf{M}: ataque real reconocido con el patrón equivocado. Es un falso positivo
+    por confusión de patrón.
+    \item \textbf{R}: la etapa que completa el patrón procede de ruido del sistema
+    operativo. Es un falso positivo benigno.
+\end{itemize}
+
+\section*{Reglas que originan los errores}
+
+Los falsos positivos confirmados se concentran en cuatro reglas Sigma:
+\begin{enumerate}
+    \item \textit{Potential Credential Dumping Activity Via LSASS}. Salta cuando
+    \texttt{csrss.exe} o \texttt{wininit.exe} abren LSASS con todos los permisos
+    (\texttt{0x1fffff}) al arrancar. Está detrás de los casos R de P1 y de la campaña de
+    ruido de APT29.
+    \item \textit{Uncommon Process Access Rights For Target Image}. Salta con
+    \texttt{csrss.exe} y \texttt{cmd.exe}. Como está etiquetada como inyección
+    (\texttt{T1055.011}), crea la etapa de escalada de los casos R de P3.
+    \item \textit{Suspicious SYSTEM User Process Creation}. Lleva las etiquetas
+    \texttt{T1003} y \texttt{T1134}, de modo que la ejecución remota con SMBExec o PsExec se
+    lee a la vez como robo de credenciales y como escalada.
+    \item \textit{HackTool - Generic Process Access}. Reconoce la herramienta, no la
+    intención, y lleva a P1 cualquier acceso a procesos de PurpleSharp o SharpView.
+\end{enumerate}
+
+En las cuatro, la etiqueta ATT\&CK describe lo que la actividad \emph{podría} ser, no lo que
+es en cada caso. La segunda versión de los patrones tratará estas reglas de forma específica
+y se medirá por separado. La Tabla~\ref{tab:revision-fp} detalla los 22 casos.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabularx}{\textwidth}{|r|c|p{4.2cm}|X|c|}
+\hline
+\textbf{\#} & \textbf{Patrón} & \textbf{Captura} & \textbf{Evidencia determinante} & \textbf{Cat.} \\
+\hline
+1 & P1 & Herpaderping con Mimikatz (sin ficha) & Ejecución de Mimikatz (2 alertas) & V \\
+2 & P1 & Empire, claves Run del registro & Exportación de una clave de Winlogon y apertura de LSASS por \texttt{csrss}/\texttt{wininit} & R \\
+3 & P1 & Empire, suscripción WMI elevada & Apertura de LSASS por \texttt{csrss}/\texttt{wininit} y proceso SYSTEM & R \\
+4 & P1 & Empire, SMBExec & Procesos lanzados como SYSTEM; la regla lleva la etiqueta \texttt{T1003} & M \\
+5 & P1 & Empire, PsExec & Ídem & M \\
+6 & P1 & Covenant, PowerShell remoto & \texttt{wsmprovhost} abre LSASS (12 alertas) & M \\
+7 & P1 & Mimikatz, Netlogon (Zerologon) & Mimikatz ejecutado y accediendo a procesos & V \\
+8 & P1 & Empire, tareas programadas & \textbf{Solo} apertura de LSASS por \texttt{csrss}/\texttt{wininit} & R \\
+9 & P1 & PurpleSharp, manual de AD & La herramienta accede a procesos (18); credenciales por \textit{kerberoasting} y rociado, no por volcado & M \\
+10 & P1 & PurpleSharp, inyección PE & La herramienta accede a procesos para inyectar (14) & M \\
+11 & P1 & Herpaderping con Mimikatz & Ejecución de Mimikatz (2 alertas) & V \\
+12 & P1 & SharpView & La herramienta accede a procesos (23); es descubrimiento & M \\
+13 & P3 & Empire, PSInject & Conexiones del \texttt{notepad} inyectado y PowerShell del agente & V (dudosa) \\
+14 & P3 & Empire, SMBExec & Instalación de servicio leída como persistencia y proceso SYSTEM como escalada & M \\
+15 & P3 & Empire, PsExec & Ídem; P2 no dispara en esta captura & M \\
+16 & P3 & Elusión de UAC con FodHelper & Una sola técnica repartida en tres etiquetas tácticas & M \\
+17 & P3 & Covenant, DCOM con secuestro de DLL & Movimiento lateral; P2 sí dispara & M \\
+18 & P3 & WMIC con XSL remoto & Escalada solo por acceso inusual de \texttt{csrss} & R \\
+19 & P3 & Ejecución de Panel de Control & Escalada solo por acceso inusual de \texttt{cmd}/\texttt{csrss} & R \\
+20 & P3 & Ejecución con CMSTP & Elusión de UAC con CMSTP (escalada real) y descubrimiento de cuentas & V \\
+21 & P3 & Aplicación HTA con Mshta & Persistencia real; escalada por acceso inusual de \texttt{cmd}/\texttt{csrss} & R \\
+22 & P3 & Exchange ProxyLogon & Proceso SYSTEM tras la ejecución remota y descubrimiento de cuentas & V \\
+\hline
+\end{tabularx}
+\caption{Clasificación de los falsos positivos candidatos: 6 V, 10 M y 6 R.}
+\label{tab:revision-fp}
+\end{table}
