@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>Catálogo de datasets</title>
+<!-- Generar el PDF: node pdf.mjs catalogo-datasets -->
+<style>
+@page { size: A4 landscape; margin: 1.1cm 1.3cm 1cm 1.3cm; }
+:root { --azul:#2F5496; --azul-claro:#D9E2F3; --azul-medio:#4472C4; --borde:#8EAADB; --texto:#1F1F1F; --gris:#595959; }
+html,body { background:#fff; }
+body { margin:0; font-family:"Carlito","Calibri",sans-serif; font-size:9.6pt; line-height:1.2; color:var(--texto); }
+h1 { font-weight:normal; font-size:19pt; margin:0 0 1pt; }
+.sub { color:var(--gris); padding-bottom:4pt; border-bottom:1pt solid var(--azul-medio); margin-bottom:5pt; }
+p { margin:0 0 5pt; }
+table { width:100%; border-collapse:collapse; font-size:8.4pt; line-height:1.13; }
+thead { display:table-header-group; }
+th { background:var(--azul-medio); color:#fff; text-align:left; padding:2.5pt 5pt; border:.5pt solid var(--azul-medio); }
+td { padding:1.5pt 5pt; border:.5pt solid var(--borde); vertical-align:top; }
+tr { page-break-inside:avoid; }
+tr.grupo td { background:var(--azul-claro); color:var(--azul); font-weight:bold; font-size:9.4pt; padding:3pt 5pt; }
+td.n { font-weight:bold; width:15%; }
+td.c { white-space:nowrap; }
+.e { display:inline-block; padding:.5pt 5pt; border-radius:7pt; font-size:8pt; font-weight:bold; white-space:nowrap; }
+.uso { background:#D5E8D4; color:#22562F; }
+.disco { background:#DAE8FC; color:#1F3F73; }
+.prev { background:#EDEDED; color:#404040; }
+.bloq { background:#FCE5C8; color:#7A4A0B; }
+.ok { background:#FFF2CC; color:#6B5300; }
+.reg { background:#fff; color:#595959; border:.6pt solid #A6A6A6; }
+.nota { font-size:8.4pt; color:var(--gris); margin-top:5pt; }
+</style></head><body>
+<h1>Catálogo de datasets del TFG</h1>
+<div class="sub">Plataforma de conciencia cibersituacional · Javier Saguar Antona · 5 de noviembre de 2026</div>
+<p><b>33 conjuntos</b> de datos y bases de conocimiento: <b>6</b> en uso, <b>22</b> en disco sin integrar, <b>1</b> previstos, <b>2</b> bloqueados y <b>2</b> solo registrados. Los descargados están en
+<code>data/external/</code>, con su licencia, origen y SHA-256 en <code>MANIFEST.md</code>. La ampliación (FA) solo se hará si
+el núcleo está cerrado el 28 de febrero de 2027.</p>
+<p class="nota" style="margin:0 0 6pt"><b>Estado.</b> <span class="e uso">En uso</span> cargado en el pipeline, con resultados.
+<span class="e disco">Descargado, sin integrar</span> o <span class="e disco">Generado, sin integrar</span>: en disco, falta pasarlo por
+el normalizador. <span class="e prev">Previsto</span>: aún no se ha descargado. <span class="e bloq">Bloqueado</span>: la descarga oficial no es accesible (error 403 o sin acceso); hay que pedirla a los autores o reintentar. <span class="e reg">Solo registrado</span>: URL, licencia y tamaño
+anotados, sin descargar. Las fases F1–F9 son las del ROADMAP; FA es la ampliación condicionada; §3.4, líneas futuras.</p>
+<table>
+<thead><tr><th>Dataset</th><th style="width:30%">Descripción</th><th style="width:30%">Función en el TFG</th><th>Fase</th><th>Licencia</th><th>Estado</th></tr></thead>
+<tbody>
+<tr class="grupo"><td colspan="6">Núcleo del proyecto (fases 1 a 3)</td></tr>
+<tr><td class="n">APT29 día 1 (MITRE ATT&amp;CK Evaluations, OTRF)</td><td>Emulación completa del grupo APT29 sobre una red Windows: 196.081 eventos de Sysmon, Security y PowerShell, con el plan de 28 pasos en 10 etapas.</td><td>Escenario principal multi-etapa con verdad conocida. Es donde P1, P2 y P3 reconocen campañas; 741 alertas.</td><td class="c">F1–F3</td><td class="c">MIT</td><td><span class="e uso">En uso</span></td></tr>
+<tr><td class="n">7 campañas LSASS (OTRF)</td><td>Siete volcados de la memoria de LSASS con Metasploit, cada uno con una herramienta distinta (Mimikatz, ProcDump, comsvcs, Out-Minidump, SharpDump, Dumpert, NanoDump).</td><td>Prueba de que P1 generaliza: detecta las 7 variantes.</td><td class="c">F3</td><td class="c">MIT</td><td><span class="e uso">En uso</span></td></tr>
+<tr><td class="n">Captura atómica comsvcs (OTRF)</td><td>184 eventos de un volcado de LSASS con comsvcs.dll.</td><td>Referencia de la normalización (100&nbsp;% de cobertura) y captura limpia de P1.</td><td class="c">F1, F3</td><td class="c">MIT</td><td><span class="e uso">En uso</span></td></tr>
+<tr><td class="n">Capturas atómicas de OTRF (~100)</td><td>Alrededor de cien capturas de técnicas sueltas, 1,22 millones de eventos.</td><td>Entrenamiento y evaluación del detector de anomalías (AUC 0,995 frente a 0,941 del control).</td><td class="c">F2</td><td class="c">MIT</td><td><span class="e uso">En uso</span></td></tr>
+<tr><td class="n">Laboratorio de emulación propio</td><td>VM Windows 11 aislada con Sysmon y Atomic Red Team: 14.895 eventos (130 maliciosos, 4 técnicas) con tres horas de actividad benigna.</td><td>Volumen benigno sostenido y etiquetado exacto. Falta la ruta CSV → OCSF y versionar los guiones.</td><td class="c">F2</td><td class="c">Propio</td><td><span class="e disco">Generado, sin integrar</span></td></tr>
+<tr class="grupo"><td colspan="6">Bases de conocimiento</td></tr>
+<tr><td class="n">Reglas Sigma (SigmaHQ)</td><td>Repositorio público de reglas de detección.</td><td>2.093 reglas traducidas a OCSF con pySigma; generan las alertas.</td><td class="c">F2</td><td class="c">DRL 1.1</td><td><span class="e uso">En uso</span></td></tr>
+<tr><td class="n">MITRE ATT&amp;CK (enterprise)</td><td>Catálogo de tácticas y técnicas en STIX.</td><td>Etiquetas de las alertas y matriz de cobertura. Se cargará en el grafo de inteligencia.</td><td class="c">F2, F4</td><td class="c">Términos de MITRE</td><td><span class="e uso">En uso</span></td></tr>
+<tr><td class="n">AnnoCTR</td><td>120 informes de amenazas anotados con técnicas ATT&amp;CK (ZIP oficial de 93,2 MB). Sus 400 + 190 textos se solapan: no son 590 documentos independientes.</td><td>Conjunto etiquetado para afinar y evaluar el extractor de técnicas (SecureBERT).</td><td class="c">F4</td><td class="c">CC BY-SA</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr><td class="n">Informes públicos de amenazas</td><td>15 informes públicos de Microsoft en HTML, varios de APT29. Los de CISA no fueron accesibles.</td><td>Corpus del extractor de técnicas. Sin anotación de referencia; hay que controlar el sesgo de un solo editor.</td><td class="c">F4</td><td class="c">Términos de cada editor</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr><td class="n">Indicadores de abuse.ch / OTX</td><td>Fuentes abiertas de indicadores de compromiso.</td><td>Poblar la plataforma de inteligencia (OpenCTI) o, en el plan B, Neo4j.</td><td class="c">F4</td><td class="c">Según fuente</td><td><span class="e prev">Previsto</span></td></tr>
+<tr class="grupo"><td colspan="6">Ya en disco para la evaluación y la red (clon de OTRF)</td></tr>
+<tr><td class="n">APT29 día 2 (OTRF)</td><td>Segundo día de la emulación: 1,7 GB, cuatro veces más que el día 1.</td><td>Más ataque y más tráfico benigno sobre la misma red; falsos positivos.</td><td class="c">FA.2, F7</td><td class="c">MIT</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr><td class="n">Zeek de APT29, días 1 y 2 (OTRF)</td><td>Registros de conexiones y DNS en JSON.</td><td>Primera fuente de red: cruzar conexiones con las aristas de P2. Primer replay del globo, con ubicaciones ilustrativas.</td><td class="c">FA.1</td><td class="c">MIT</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr><td class="n">Log4Shell (OTRF)</td><td>Explotación de CVE-2021-44228 con Auditd/AUOMS, Sysmon y PCAP.</td><td>Conjunto de evaluación y prueba de formato Linux.</td><td class="c">F7, FA.4</td><td class="c">MIT</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr><td class="n">GoldenSAML (OTRF)</td><td>Falsificación de credenciales federadas: Windows, Azure AD y Microsoft 365.</td><td>Cadena de identidad híbrida en el conjunto de evaluación.</td><td class="c">F7</td><td class="c">MIT</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr class="grupo"><td colspan="6">Ampliación: Windows externo y Linux</td></tr>
+<tr><td class="n">COMISET LAB (U. P. Comillas)</td><td>Laboratorio con ataques etiquetados ATT&amp;CK, 4,91 GB.</td><td>Validación externa de la detección Windows sin mapeadores nuevos; muestra filtrada en streaming.</td><td class="c">FA.3</td><td class="c">CC BY 4.0</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr><td class="n">COMISET REAL</td><td>Actividad normal de una red universitaria: ZIP de 31,7 GB (934,5 GB sin comprimir). Piloto de 100.000 registros de dos hosts; el 99&nbsp;% son Sysmon 10.</td><td>Fondo benigno para medir falsas alarmas. El piloto es un prefijo, no una muestra representativa; falta adaptar el envoltorio de Elasticsearch.</td><td class="c">FA.3</td><td class="c">CC BY 4.0</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr><td class="n">CAM-LDS v2 (AIT)</td><td>Campañas Linux con auditoría, autenticación, syslog y flujos, y un manifiesto de pasos con técnicas.</td><td>Explotación web → sudo → clave SSH. Prueba de que P3 generaliza a Linux; el escenario 3 se reserva para evaluar.</td><td class="c">FA.4</td><td class="c">CC BY 4.0</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr><td class="n">AttackMate Evaluation Data</td><td>Movimiento lateral por SSH y tres variantes de escalada, generadas con AttackMate, CALDERA y Atomic Red Team.</td><td>Comprobar si se detecta lo mismo cuando cambia la herramienta.</td><td class="c">FA.4</td><td class="c">CC BY 4.0</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr><td class="n">Splunk Attack Data: cron</td><td>Log de auditd de una edición de cron (T1053.003) con su ficha.</td><td>Verificar el mapeo de auditd a OCSF y una regla.</td><td class="c">FA.4</td><td class="c">Apache 2.0</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr><td class="n">AIT Alert Data Set</td><td>Alertas de Wazuh, Suricata y AMiner con ventanas etiquetadas, 96,2 MB.</td><td>Probar el correlador de Flink con alertas externas, aparte de Sigma.</td><td class="c">FA.4</td><td class="c">CC BY 4.0</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr><td class="n">AIT Log Data Set v2</td><td>Actividad normal simulada con auditoría, DNS, Apache y tráfico, y una exfiltración por DNS (<code>russellmitchell.zip</code>, 7,13 GB, sin extraer). Etiquetas generadas por reglas.</td><td>Fondo benigno Linux y caso de exfiltración (P4).</td><td class="c">FA.4</td><td class="c">CC BY-NC-SA 4.0</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr class="grupo"><td colspan="6">Ampliación: disponibilidad (DoS y DDoS)</td></tr>
+<tr><td class="n">BOUN DDoS</td><td>Inundaciones SYN y UDP sobre tráfico universitario, por paquete; cuatro ventanas de ataque documentadas. IP anonimizadas o falsificadas.</td><td>Primer detector por ventanas en Flink y sus falsas alarmas. No sirve para ubicar atacantes.</td><td class="c">FA.5</td><td class="c">CC BY 4.0</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr><td class="n">SDN TCP-SYN</td><td>Dos PCAP (benigno y SYN) y un CSV de flujos etiquetado de 2,26 MB.</td><td>Dos atacantes contra un servicio: medir cuánto tarda la alerta. El CSV sirve para el globo, con ubicaciones simuladas.</td><td class="c">FA.5</td><td class="c">CC BY 4.0</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr><td class="n">AdDDoSDN</td><td>CSV por paquete: 1,69 millones de filas con SYN, UDP, ICMP y ataques lentos.</td><td>Cubrir ICMP y el agotamiento de conexiones.</td><td class="c">FA.5</td><td class="c">MIT</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr><td class="n">DDoS and host background traffic</td><td>PCAP con 100 IP de origen y cinco tasas de ataque, sobre fondo de un equipo (3,05 GB).</td><td>Probar el detector con más orígenes y distintas cargas.</td><td class="c">FA.5</td><td class="c">CC BY 4.0</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr><td class="n">CICIDS2017 corregido (DistriNet)</td><td>Versión corregida por investigadores (CNS 2022) de un conjunto clásico de intrusiones de red, con DDoS, en CSV.</td><td>Familias de red para el detector. Su DDoS va tras NAT: no prueba orígenes distintos ni indisponibilidad.</td><td class="c">FA.5</td><td class="c">Uso en investigación con cita</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr><td class="n">CSE-CIC-IDS2018, día 20</td><td>CSV de 4,05 GB y 7,95 millones de flujos: tráfico benigno y LOIC-HTTP, diez orígenes hacia un destino.</td><td>Caso de muchos a uno. Sus horas no llevan AM/PM: no vale como verdad temporal ni para medir latencia.</td><td class="c">FA.5</td><td class="c">Términos del editor</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr><td class="n">Orion 2026</td><td>Cinco días: dos benignos, DoS uno a uno y DDoS de muchos a uno y de muchos a muchos.</td><td>Comparar un día benigno con un DDoS de muchos a uno; reservar un día para evaluar.</td><td class="c">FA.5</td><td class="c">CC BY 4.0</td><td><span class="e bloq">Bloqueado</span></td></tr>
+<tr><td class="n">CICDDoS2019</td><td>Ataques de reflexión y amplificación.</td><td>Una variante de amplificación, reconstruida por ventanas desde los paquetes.</td><td class="c">FA.5</td><td class="c">Términos del editor</td><td><span class="e bloq">Bloqueado</span></td></tr>
+<tr class="grupo"><td colspan="6">Ampliación: otras familias de ataque</td></tr>
+<tr><td class="n">Splunk Attack Data: dcrypt y shadowcopy</td><td>Capturas de cifrado de ransomware (T1486) y borrado de instantáneas (T1490), con menos de 0,5 MB en total.</td><td>Señales sueltas de impacto. Son de años y hosts distintos: no forman una campaña.</td><td class="c">FA.6</td><td class="c">Apache 2.0</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr class="grupo"><td colspan="6">Fuera del alcance (trabajo relacionado)</td></tr>
+<tr><td class="n">Splunk Attack Data: macOS Gatekeeper</td><td>Log de osquery de una evasión de Gatekeeper (T1553.001).</td><td>Primera fuente macOS, si alguna vez se amplía.</td><td class="c">§3.4</td><td class="c">Apache 2.0</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
+<tr><td class="n">IoT-23</td><td>Flujos de Zeek etiquetados de botnets IoT y tráfico benigno.</td><td>Solo red; trabajo relacionado.</td><td class="c">§3.4</td><td class="c">CC BY 4.0</td><td><span class="e reg">Solo registrado</span></td></tr>
+<tr><td class="n">DARPA Transparent Computing (E3)</td><td>Grafos de procedencia entre procesos, ficheros y conexiones (TB).</td><td>No es un grafo de ataque; como mucho, un fragmento.</td><td class="c">§3.4</td><td class="c">Dominio público</td><td><span class="e reg">Solo registrado</span></td></tr>
+</tbody></table>
+</body></html>

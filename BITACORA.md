@@ -1226,3 +1226,37 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - Ningún conjunto está verificado aún contra el normalizador (canales, etiquetado).
   - Todo sigue condicionado al 28-02-2027.
 - **Archivos tocados:** `tfg-ciberconciencia/data/external/` (fuera de git).
+
+### 2026-11-05 — Más datasets externos y piloto de COMISET REAL
+- **Con qué/quién:** otro agente (descargas y piloto, solo dentro de `data/external/`, sin commits); Claude Code (revisión y esta entrada). Resumen completo del otro agente en `tfg-ciberconciencia/data/external/RESUMEN_PARA_BITACORA_ROADMAP.md`.
+- **Hecho:**
+  - **Nuevos en disco:**
+    - AIT LDS v2 (`russellmitchell.zip`, 7,13 GB);
+    - CICIDS2017 corregido (343,5 MB);
+    - CSE-CIC-IDS2018, día 20 (CSV de 4,05 GB);
+    - Splunk dcrypt (T1486) y shadowcopy (T1490);
+    - AnnoCTR (93,2 MB);
+    - 15 informes públicos de Microsoft.
+
+    Todos tienen las sumas del editor comprobadas cuando las publica.
+  - **COMISET REAL**, con autorización expresa de Javier para pasar del límite de 10 GB:
+    - ZIP de 31.701.737.521 B, MD5 `1718e161dc50b8c49e00020b596974d3` coincidente;
+    - el JSON interno ocupa 934,5 GB y no se extrajo.
+  - **Piloto de particionado** (`comiset/real-sample-v1/`):
+    - recorrió 145.123 registros y seleccionó 100.000;
+    - 10 particiones con índice de procedencia por línea y su DLQ;
+    - 27,9 MB de salida, verificada por CRC y SHA-256.
+  - `data/external` ocupa 53,3 GB, dentro del presupuesto de 60 GB.
+- **Limitaciones, para que no se cuelen en la memoria:**
+  - **COMISET:** el piloto es un prefijo, no una muestra representativa. Son dos hosts con ventanas de días distintos, no una campaña. Está desequilibrado (99.358 de 100.000 son Sysmon 10). Además, el envoltorio de Elasticsearch exige adaptar el normalizador, y REAL es actividad «normal» según el editor, sin etiqueta por evento.
+  - **CSE-CIC-IDS2018:** no usar como verdad temporal (horas sin AM/PM).
+  - **CICIDS2017:** su DDoS va tras NAT.
+  - **AnnoCTR:** no son 590 documentos independientes.
+  - **Los 15 informes:** son de un único editor y no tienen anotación de referencia.
+  - **Splunk dcrypt y shadowcopy:** no forman una campaña.
+  - **AIT:** sus etiquetas salen de reglas.
+- **Estado:** nada está normalizado, ingerido ni evaluado, y **ninguna fase se da por cerrada**. Prioridades sin cambios:
+  1. cerrar F3 (falsos positivos y ratio de reducción);
+  2. después, F4 y F5;
+  3. Linux y DoS siguen en la ampliación condicionada al 28-02-2027.
+- **Archivos tocados:** `tfg-ciberconciencia/docs/ROADMAP.md` (disponibilidad de datos en FA y F4.2); `documentos/catalogo-datasets.{html,pdf}`; `data/external/` (fuera de git).
