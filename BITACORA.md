@@ -1350,3 +1350,46 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - DoD con 7 puntos y riesgos propios;
   - Neo4j adelantado desde F5.1;
   - referencias ajustadas en F5, F6, F7, F9 y R3.
+
+### 2026-11-06 (3) — F4.1: Neo4j, ATT&CK v19.2 en el grafo y normalización de técnicas
+- **Con qué/quién:** Javier (levantar Neo4j, instalar el driver y cargar); Claude Code (servicio en el compose, cargador, normalización, inspección de AnnoCTR y esta entrada).
+- **Hecho:**
+  - **Neo4j en el compose:** perfil `graph`, `neo4j:5.26.31-community`, GDS 2.13.13 y APOC 5.26.31, con puertos solo en localhost. Se levanta con `./scripts/up.sh graph`. El driver de Python es `neo4j==5.28.8`.
+  - **ATT&CK Enterprise v19.2** (agosto de 2026) en `data/cti/attack/`, SHA-256 `dc1639ca…c3d8f4`.
+    - Se descartó la v20 porque salió el día anterior con un parche el mismo día.
+    - El paquete trae 26.086 objetos: 858 técnicas (149 revocadas), 191 grupos y 21.262 relaciones.
+  - **Cargador STIX → Neo4j** (`cti/stix_loader/`), con 9 tests:
+    - transformación pura separada de la escritura;
+    - identidad por el id STIX;
+    - etiquetas por tipo (`:CtiCampaign` para no confundir con las campañas del Pilar A);
+    - aristas `IN_TACTIC` desde las fases de kill chain;
+    - `sources` en cada nodo y relación, para la comparativa con OpenCTI.
+
+    Carga en 4,7 s y da 4.823 nodos y 22.352 relaciones. **Recargar da los mismos totales.** APT29 usa 66 técnicas vigentes.
+  - **Normalización de técnicas** (`cti/attack_ids.py`, 10 tests): sigue las cadenas `revoked-by`, marca las obsoletas, sube a la técnica padre y lee etiquetas Sigma. Traduce sola lo que en F3 se hizo a mano (`T1086` → `T1059.001`, `T1088` → `T1548.002`).
+  - **Deriva de versión medida:**
+    - alertas y campañas de F3: 100 % vigentes;
+    - verdad conocida: 2 técnicas revocadas (`T1562.002`, `T1562.004`) que no afectan a P1–P3;
+    - AnnoCTR: el 98,6 % está vigente, `T1562` → `T1685`, y 5 identificadores son de ATT&CK Mobile.
+  - **AnnoCTR inspeccionado** (solo lectura):
+    - solo 120 de los 400 informes están anotados (70/16/34); los otros 280 son texto;
+    - la anotación es por mención, enlazada a ATT&CK;
+    - 145 técnicas, casi todas de nivel padre;
+    - dos tercios de las menciones son implícitas;
+    - hay frases negativas en `ner_json`;
+    - 9 informes anotados hablan de APT29 o SolarWinds, lo que supone una fuga leve a declarar.
+
+    Tarea propuesta: clasificar cada frase en técnicas padre, evaluando por frase y por informe.
+- **Decisiones:** ATT&CK v19.2 como versión del proyecto; la comparación con Sigma y F3 se hace a nivel de técnica padre.
+- **Pendiente:**
+  - feed de abuse.ch;
+  - sustituir la lista manual de `verdad_conocida.py` por el servicio de normalización;
+  - después, F4.2 (OpenCTI).
+- **Archivos tocados:**
+  - `tfg-ciberconciencia/`:
+    - `infra/docker-compose.yml`
+    - `scripts/up.sh`
+    - `cti/{__init__.py,attack_ids.py,test_attack_ids.py}`
+    - `cti/stix_loader/{__init__.py,transform.py,load.py,test_transform.py}`
+    - `docs/ROADMAP.md`
+  - `tfg-memoria/`: esta entrada.
