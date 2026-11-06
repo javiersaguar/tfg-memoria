@@ -1443,3 +1443,76 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
     - `cti/comparativa/{__init__.py,opencti_export.py,fidelidad.py}`
     - `docs/ROADMAP.md`
   - `tfg-memoria/`: esta entrada.
+
+### 2026-11-06 (5) — Orion 2026 adquirido: datos para DoS y DDoS (FA.5)
+- **Con qué/quién:** Javier (consiguió el ZIP CSV oficial; la descarga directa seguía dando 403); Claude Code (verificación, inspección, inventario y esta entrada).
+- **Hecho:**
+  - **Adquisición.** `dataset_orion_2026_csv.zip` (2.983.526.992 B) copiado a `data/external/orion-2026/` sin modificar. **El SHA-256 coincide con el publicado por el editor** (`9a7b7d2e…7f92`).
+  - **Contenido.** Inspeccionado como datos, sin extraer: cinco `dayN.csv.zst` (CSV comprimido con zstd, unos 11 GB descomprimidos), un README y la licencia CC BY 4.0 (citar doi:10.1109/ACCESS.2026.3738009).
+    - Flujos con 95 columnas: 5-tupla, paquetes y bytes por sentido, tiempos, banderas TCP y etiquetas `str_label`/`bin_label`.
+    - Se leen en streaming con `compression.zstd` de Python 3.14.
+  - **Estructura:**
+    - días 1–2 benignos;
+    - día 3 DoS 1→1 (10.0.0.4);
+    - día 4 DDoS N→1 (10.0.0.4–7);
+    - día 5 DDoS N→N;
+    - 8 ataques por día (PSH, UDP, ICMP, SYN, URG, RST, ACK, FIN) de 30 min cada 3 h, contra 10.0.0.1:80, 10.0.0.2:8080 y 10.0.0.3:9090.
+  - **Recuentos del README re-verificados** leyendo los cinco días completos (ver `RECUENTO.json` junto al ZIP).
+  - **Documentación actualizada:**
+    - inventario de datos (`data/external/MANIFEST.md`);
+    - ROADMAP: Orion pasa de bloqueado a conjunto principal de FA.5;
+    - catálogo de datasets: Orion «Descargado, sin integrar»; 23 en disco y 1 bloqueado (CICDDoS2019).
+- **Decisiones y trampas:**
+  - **Los ataques ICMP son solo 15–45 flujos** con millones de paquetes. Un detector por número de flujos no los ve: las señales por ventana tienen que ser paquetes y bytes.
+  - **Reparto fijado antes de mirar resultados:**
+    - calibrar umbrales con el día 2 (benigno) y el día 3 (DoS 1→1);
+    - evaluar con los días 4 y 5 completos sin retocar;
+    - falsas alarmas en el día 1.
+  - **La latencia será optimista:** el CSV da flujos ya cerrados, reproducidos por su hora de inicio. Se declara.
+  - **Recuentos verificados:** coinciden flujo a flujo con el README en los cinco días (25,6 M de flujos).
+  - **Hallazgo:** en los días 4 y 5 (DDoS), **todos los flujos de ataque salen de 10.0.0.4**; 10.0.0.5–7 solo generan tráfico benigno (unos 22.000 flujos cada una el día 4). Por número de orígenes, el DDoS N→1 parece un DoS 1→1, así que el rasgo «concentrado o distribuido» no se valida con Orion, sino con el laboratorio o con CICDDoS2019. Falta ver en el artículo si es suplantación de IP o un artefacto de la captura.
+  - **Pendiente:** confirmar en el artículo la zona horaria de `timestamp`, la unidad de `flw_duration` y el origen único del DDoS.
+- **Estado:** FA sigue condicionada al punto de control del 28-02-2027. Los datos de DoS/DDoS quedan listos para cuando se abra FA.5, o antes si Javier decide adelantarla.
+- **Archivos tocados:**
+  - `tfg-ciberconciencia/docs/ROADMAP.md`;
+  - `tfg-memoria/documentos/catalogo-datasets.{html,pdf}`;
+  - `data/external/{MANIFEST.md,orion-2026/}`, fuera de git;
+  - esta entrada.
+
+### 2026-11-07 — Sesión nocturna: ThreatFox entero en OpenCTI y ML-2 preparado
+- **Con qué/quién:** Javier (levantó OpenCTI y lanzó la subida antes de dormir); Claude Code (script de subida, datos y línea base de ML-2, script de entrenamiento y esta entrada). No se tocó ningún servicio durante la noche.
+- **Hecho:**
+  - **ThreatFox completo a OpenCTI** (`cti/comparativa/opencti_import.py`):
+    - el paquete de 137 MB se parte en 7 trozos de unos 40.000 objetos (272.853 en total), cada uno con sus relaciones y familias;
+    - se suben con `uploadImport` y el conector ImportFileStix los procesa solo;
+    - `estado` suma los works y da la tasa final.
+    - Subida a las 23:44 UTC. **Tasa medida en la primera hora: unos 3 objetos/s**, frente a 12/s con ATT&CK. Elasticsearch está al 260 % de CPU, así que el cuello de botella parece la plataforma. A ese ritmo, el feed completo tardaría unas 22 h; el plan B lo cargó en 17 s.
+  - **Datos de ML-2** (`cti/extract/annoctr.py`, sobre el ZIP sin extraer):
+    - las menciones marcadas en cada frase se emparejan con sus enlaces a ATT&CK (casan 3.374 de 3.375);
+    - técnicas padre normalizadas a v19.2;
+    - particiones publicadas por informe: entrenamiento 70/7.570/1.499, desarrollo 16/1.550/335, prueba 34/3.059/754 (informes/frases/con técnica);
+    - **59 técnicas en el espacio de etiquetas**, que cubren el 85 % de las menciones de prueba.
+  - **Métricas comunes** (`cti/extract/metricas.py`): por frase, por mención (explícita frente a implícita) y por informe.
+  - **LB-a, diccionario de ATT&CK** (`cti/extract/diccionario.py`):
+    - 1.581 términos;
+    - la poda, decidida solo con desarrollo, quita 9 genéricos de subtécnica («Malware», «At», «Server», «DNS»…).
+    - **En prueba:** por frase F1 0,33 (P 0,72; R 0,21); por informe F1 0,49 (P 0,81; R 0,35); **exhaustividad por mención: explícitas 0,35, implícitas 0,15.** Sin poda, el F1 por frase cae a 0,21.
+  - **Script de afinado** (`cti/extract/entrenar.py`):
+    - multietiqueta, con la época y el umbral elegidos en desarrollo y prueba evaluada una sola vez;
+    - semillas, MLflow y predicciones guardadas para el análisis de errores.
+- **Decisiones:**
+  - **SecureBERT 2.0** (`cisco-ai/SecureBERT2.0-base`, Apache 2.0) frente a **ModernBERT-base**, su modelo de partida: aísla el efecto del preentrenamiento en ciberseguridad.
+  - **El SecureBERT original no se usa:** solo publica pesos en pickle (`pytorch_model.bin`), que pueden ejecutar código al cargarse.
+  - Solo se cargan safetensors con revisión fijada.
+  - **Entorno de ML aparte:** `.venv-ml` con Python 3.12, torch 2.11.0+cu128 (la RTX 5070 necesita CUDA ≥12.8) y `ml/requirements-ml2.txt`, con mlflow 2.19.0 como el servidor.
+- **Bloqueos y pendientes:**
+  - **La GPU no responde en WSL** (`nvidia-smi`: «Failed to initialize NVML»). Revisar el driver NVIDIA de Windows (≥570) y `wsl --update`. Ojo: reiniciar WSL para Docker y OpenCTI.
+  - **Decidir qué hacer con la carga de OpenCTI:** la tasa ya está medida, así que se puede parar a medias, dejarla correr o añadir workers (la comparación sería con otra configuración).
+  - **ML-2:** crear el entorno, entrenar con 3 semillas cada modelo, analizar errores y hacer la evaluación sobre el corpus (perfil de APT29).
+- **Archivos tocados:**
+  - `tfg-ciberconciencia/`:
+    - `cti/comparativa/opencti_import.py`
+    - `cti/extract/{__init__.py,annoctr.py,metricas.py,diccionario.py,entrenar.py}`
+    - `ml/requirements-ml2.txt`
+    - `docs/ROADMAP.md`
+  - `tfg-memoria/`: esta entrada.

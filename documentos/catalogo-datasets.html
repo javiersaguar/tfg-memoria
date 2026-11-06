@@ -27,8 +27,8 @@ td.c { white-space:nowrap; }
 .nota { font-size:8.4pt; color:var(--gris); margin-top:5pt; }
 </style></head><body>
 <h1>Catálogo de datasets del TFG</h1>
-<div class="sub">Plataforma de conciencia cibersituacional · Javier Saguar Antona · 5 de noviembre de 2026</div>
-<p><b>33 conjuntos</b> de datos y bases de conocimiento: <b>6</b> en uso, <b>22</b> en disco sin integrar, <b>1</b> previstos, <b>2</b> bloqueados y <b>2</b> solo registrados. Los descargados están en
+<div class="sub">Plataforma de conciencia cibersituacional · Javier Saguar Antona · 6 de noviembre de 2026</div>
+<p><b>33 conjuntos</b> de datos y bases de conocimiento: <b>6</b> en uso, <b>23</b> en disco sin integrar, <b>1</b> previstos, <b>1</b> bloqueado y <b>2</b> solo registrados. Los descargados están en
 <code>data/external/</code>, con su licencia, origen y SHA-256 en <code>MANIFEST.md</code>. La ampliación (FA) solo se hará si
 el núcleo está cerrado el 28 de febrero de 2027.</p>
 <p class="nota" style="margin:0 0 6pt"><b>Estado.</b> <span class="e uso">En uso</span> cargado en el pipeline, con resultados.
@@ -70,7 +70,7 @@ anotados, sin descargar. Las fases F1–F9 son las del ROADMAP; FA es la ampliac
 <tr><td class="n">DDoS and host background traffic</td><td>PCAP con 100 IP de origen y cinco tasas de ataque, sobre fondo de un equipo (3,05 GB).</td><td>Probar el detector con más orígenes y distintas cargas.</td><td class="c">FA.5</td><td class="c">CC BY 4.0</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
 <tr><td class="n">CICIDS2017 corregido (DistriNet)</td><td>Versión corregida por investigadores (CNS 2022) de un conjunto clásico de intrusiones de red, con DDoS, en CSV.</td><td>Familias de red para el detector. Su DDoS va tras NAT: no prueba orígenes distintos ni indisponibilidad.</td><td class="c">FA.5</td><td class="c">Uso en investigación con cita</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
 <tr><td class="n">CSE-CIC-IDS2018, día 20</td><td>CSV de 4,05 GB y 7,95 millones de flujos: tráfico benigno y LOIC-HTTP, diez orígenes hacia un destino.</td><td>Caso de muchos a uno. Sus horas no llevan AM/PM: no vale como verdad temporal ni para medir latencia.</td><td class="c">FA.5</td><td class="c">Términos del editor</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
-<tr><td class="n">Orion 2026</td><td>Cinco días: dos benignos, DoS uno a uno y DDoS de muchos a uno y de muchos a muchos.</td><td>Comparar un día benigno con un DDoS de muchos a uno; reservar un día para evaluar.</td><td class="c">FA.5</td><td class="c">CC BY 4.0</td><td><span class="e bloq">Bloqueado</span></td></tr>
+<tr><td class="n">Orion 2026</td><td>Cinco días de flujos de red etiquetados (95 columnas): dos benignos, DoS uno a uno y DDoS de muchos a uno y de muchos a muchos; 8 ataques de 30 min por día. CSV de 2,98 GB, suma del editor verificada.</td><td>Calibrar umbrales con un día benigno y el DoS uno a uno; evaluar con los días de DDoS completos y medir falsas alarmas en el otro día benigno.</td><td class="c">FA.5</td><td class="c">CC BY 4.0</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
 <tr><td class="n">CICDDoS2019</td><td>Ataques de reflexión y amplificación.</td><td>Una variante de amplificación, reconstruida por ventanas desde los paquetes.</td><td class="c">FA.5</td><td class="c">Términos del editor</td><td><span class="e bloq">Bloqueado</span></td></tr>
 <tr class="grupo"><td colspan="6">Ampliación: otras familias de ataque</td></tr>
 <tr><td class="n">Splunk Attack Data: dcrypt y shadowcopy</td><td>Capturas de cifrado de ransomware (T1486) y borrado de instantáneas (T1490), con menos de 0,5 MB en total.</td><td>Señales sueltas de impacto. Son de años y hosts distintos: no forman una campaña.</td><td class="c">FA.6</td><td class="c">Apache 2.0</td><td><span class="e disco">Descargado, sin integrar</span></td></tr>
