@@ -1381,9 +1381,20 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 
     Tarea propuesta: clasificar cada frase en técnicas padre, evaluando por frase y por informe.
 - **Decisiones:** ATT&CK v19.2 como versión del proyecto; la comparación con Sigma y F3 se hace a nivel de técnica padre.
+- **Feed de IOCs (ThreatFox):**
+  - **Acceso.** Las descargas públicas de abuse.ch responden «410 Gone». Javier creó una cuenta y su Auth-Key está en `.env`, que git ignora. Los exports solo traen seis meses.
+  - **Licencia.** Uso gratuito con criterio de uso razonable («fair use»), no CC0.
+  - **Conversión.** `cti/feeds/threatfox.py` (6 tests) convierte el CSV a STIX con identificadores uuid5:
+    - 135.737 IOCs y 508 familias, sin descartes;
+    - cargados en 17 s, con lo que el grafo suma 141.068 nodos y 158.089 relaciones.
+  - **Enlace familia → software de ATT&CK** (`cti/feeds/threatfox_attack.cypher`, idempotente):
+    - por nombre o alias y solo si la coincidencia es única: 92 familias enlazadas;
+    - 4 ambiguas descartadas (Snake ↔ Uroburos, DarkComet ↔ PoisonIvy por «Breut», X-Agent ↔ Fysbis, RokRAT ↔ DOGCALL);
+    - **el 25,6 % de los IOCs llega a técnicas**;
+    - lo que no se enlaza no está en el catálogo de ATT&CK.
 - **Pendiente:**
-  - feed de abuse.ch;
   - sustituir la lista manual de `verdad_conocida.py` por el servicio de normalización;
+  - citar ThreatFox y ATT&CK v19.2 en el anexo de licencias de la memoria;
   - después, F4.2 (OpenCTI).
 - **Archivos tocados:**
   - `tfg-ciberconciencia/`:
@@ -1391,5 +1402,6 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
     - `scripts/up.sh`
     - `cti/{__init__.py,attack_ids.py,test_attack_ids.py}`
     - `cti/stix_loader/{__init__.py,transform.py,load.py,test_transform.py}`
+    - `cti/feeds/{__init__.py,threatfox.py,test_threatfox.py,threatfox_attack.cypher}`
     - `docs/ROADMAP.md`
   - `tfg-memoria/`: esta entrada.
