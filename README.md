@@ -1,7 +1,7 @@
 # TFG — Memoria y documentación
 
 Memoria en LaTeX, bitácora de trabajo y anotaciones del Trabajo Fin de Grado
-*Plataforma de conciencia cibersituacional*.
+*Diseño y desarrollo de una plataforma de conciencia cibersituacional para la detección de ataques multi-etapa y priorización de incidentes*.
 
 Código del proyecto: repositorio `tfg-ciberconciencia`.
 

@@ -1655,3 +1655,12 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - Javier valida la revisión de falsos positivos de ML-2;
   - 6b con day2 cuando se cargue;
   - confirmar el límite de páginas.
+
+### 2026-11-07 (8) — Normativa confirmada y título elegido
+- **Normativa TFG GISD v15, §8:** el cuerpo puede tener 60 páginas como máximo, sin contar índices, cabeceras de capítulo, resúmenes, glosario, dedicatorias ni bibliografía; los anexos quedan fuera. La memoria va por 46.
+- **Puntos para consultar con la tutora:**
+  - la normativa llama «capítulo obligatorio» al de impacto y al de presupuesto, que hoy son los anexos A y B;
+  - pide un título que refleje el desarrollo.
+- **Título elegido:** «Diseño y desarrollo de una plataforma de conciencia cibersituacional para la detección de ataques multi-etapa y priorización de incidentes».
+  - Puesto en la portada, la portada naranja, la página de autor y el README.
+  - Los documentos de reuniones anteriores conservan el título que tenían.
