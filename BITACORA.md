@@ -1520,3 +1520,27 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
     - `ml/requirements-ml2.txt`
     - `docs/ROADMAP.md`
   - `tfg-memoria/`: esta entrada.
+
+### 2026-11-07 (2) — ML-2: primeros entrenamientos de SecureBERT 2.0 y ModernBERT
+- **Con qué/quién:** Javier (reactivó la RTX 5070 en MSI Center y dio permiso para lanzar los entrenamientos desde el móvil); Claude Code (entorno, entrenamientos, tabla y esta entrada).
+- **Hecho:**
+  - **Entorno `.venv-ml`:** Python 3.12, torch 2.11.0+cu128, transformers 5.20.2, mlflow 2.19.0. PyTorch ve la RTX 5070 Laptop (8 GB, sm_120). Añadido a `.gitignore`.
+  - **6 entrenamientos** (2 modelos × 3 semillas), unos 5,5 min cada uno, de 13:00 a 13:34.
+  - **Tabla** con `cti/extract/resumen.py` (en `data/ml2/resultados/tabla-ml2.{md,json}`).
+- **Resultados en prueba** (media de 3 semillas):
+  - **SecureBERT 2.0: F1 por frase 0,553 ± 0,019; por informe 0,670 ± 0,026.** Exhaustividad en menciones: explícitas 0,72, implícitas 0,42.
+  - **ModernBERT-base:** 0,519 ± 0,010 por frase; 0,620 ± 0,041 por informe.
+  - **Diccionario (LB-a):** 0,330 por frase; 0,490 por informe; implícitas 0,15.
+  - SecureBERT gana en las 3 semillas emparejadas (+0,02 a +0,05 por frase). La ventaja viene de las menciones explícitas; en las implícitas casi empatan.
+  - **El diccionario tiene mejor F1 macro (0,35 frente a 0,26–0,30):** acierta más en técnicas raras cuando se nombran.
+- **Incidencias:**
+  - MLflow no recibe el fichero de resultados: el servidor guarda los artefactos en `/mlflow`, una ruta suya. `entrenar.py` ya no se rompe por ello y los resultados quedan en disco.
+- **Pendiente:**
+  - prueba por remuestreo de informes para la diferencia entre modelos;
+  - análisis de errores por técnica (frecuencia, ambigüedad) y por qué el diccionario gana en F1 macro;
+  - probar la combinación de modelo y diccionario;
+  - evaluación sobre el corpus (perfil de APT29).
+- **Archivos tocados:**
+  - `tfg-ciberconciencia/`: `cti/extract/{entrenar.py,resumen.py}`, `.gitignore`, `docs/ROADMAP.md`;
+  - `data/ml2/{modelos,logs,resultados}/`, fuera de git;
+  - esta entrada.
