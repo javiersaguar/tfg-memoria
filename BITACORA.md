@@ -1488,7 +1488,8 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
     - `estado` suma los works y da la tasa final.
     - Subida a las 23:44 UTC. En los primeros 8 minutos iba a unos 3 objetos/s, con Elasticsearch al 260 % de CPU, y se estimaron unas 22 h. **La estimación era errónea:** el ritmo subió a unos 9/s a los 16 minutos y a unos 23/s después.
     - **Resultado: los 7 works terminaron a las 03:12 UTC, 272.853 de 272.853 objetos procesados en 3 h 28 min (21,9 objetos/s de media).** El plan B cargó el mismo paquete en 17 s. Con ATT&CK, OpenCTI fue a unos 12/s.
-    - Queda comprobar que lo procesado está creado (recuento de indicadores en la plataforma) y medir RAM y disco con el feed cargado.
+    - **Con el feed cargado:** 13,7 GB de RAM (Elasticsearch 11,5) y 1,9 GB de disco (Elasticsearch 1,37 GB), frente a 3,6 GB y 865 MB del plan B con los mismos datos.
+    - Queda comprobar que lo procesado está creado (recuento de indicadores en la plataforma).
   - **Datos de ML-2** (`cti/extract/annoctr.py`, sobre el ZIP sin extraer):
     - las menciones marcadas en cada frase se emparejan con sus enlaces a ATT&CK (casan 3.374 de 3.375);
     - técnicas padre normalizadas a v19.2;
@@ -1508,7 +1509,7 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - Solo se cargan safetensors con revisión fijada.
   - **Entorno de ML aparte:** `.venv-ml` con Python 3.12, torch 2.11.0+cu128 (la RTX 5070 necesita CUDA ≥12.8) y `ml/requirements-ml2.txt`, con mlflow 2.19.0 como el servidor.
 - **Bloqueos y pendientes:**
-  - **La GPU no responde en WSL** (`nvidia-smi`: «Failed to initialize NVML»). Revisar el driver NVIDIA de Windows (≥570) y `wsl --update`. Ojo: reiniciar WSL para Docker y OpenCTI.
+  - **La GPU no responde en WSL** (`nvidia-smi`: «Failed to initialize NVML»; CUDA `cuInit` = 100, sin dispositivo). Diagnosticado por la mañana: el driver (620.67) y WSL (2.7.10) están bien; **la RTX 5070 del portátil está apagada**. Windows solo enumera la Radeon 610M integrada y marca la NVIDIA como «Unknown» (no presente). Se arregla con el modo de gráficos del portátil (MSI Center: híbrido o discreta) y un reinicio.
   - ~~Decidir qué hacer con la carga de OpenCTI~~: terminó sola durante la noche.
   - **F4.2:** medir el valor añadido sobre el feed completo y pasar 2–3 informes por el conector de documentos.
   - **ML-2:** crear el entorno, entrenar con 3 semillas cada modelo, analizar errores y hacer la evaluación sobre el corpus (perfil de APT29).
