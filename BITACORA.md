@@ -1486,7 +1486,9 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
     - el paquete de 137 MB se parte en 7 trozos de unos 40.000 objetos (272.853 en total), cada uno con sus relaciones y familias;
     - se suben con `uploadImport` y el conector ImportFileStix los procesa solo;
     - `estado` suma los works y da la tasa final.
-    - Subida a las 23:44 UTC. **Tasa medida en la primera hora: unos 3 objetos/s**, frente a 12/s con ATT&CK. Elasticsearch está al 260 % de CPU, así que el cuello de botella parece la plataforma. A ese ritmo, el feed completo tardaría unas 22 h; el plan B lo cargó en 17 s.
+    - Subida a las 23:44 UTC. En los primeros 8 minutos iba a unos 3 objetos/s, con Elasticsearch al 260 % de CPU, y se estimaron unas 22 h. **La estimación era errónea:** el ritmo subió a unos 9/s a los 16 minutos y a unos 23/s después.
+    - **Resultado: los 7 works terminaron a las 03:12 UTC, 272.853 de 272.853 objetos procesados en 3 h 28 min (21,9 objetos/s de media).** El plan B cargó el mismo paquete en 17 s. Con ATT&CK, OpenCTI fue a unos 12/s.
+    - Queda comprobar que lo procesado está creado (recuento de indicadores en la plataforma) y medir RAM y disco con el feed cargado.
   - **Datos de ML-2** (`cti/extract/annoctr.py`, sobre el ZIP sin extraer):
     - las menciones marcadas en cada frase se emparejan con sus enlaces a ATT&CK (casan 3.374 de 3.375);
     - técnicas padre normalizadas a v19.2;
@@ -1507,7 +1509,8 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - **Entorno de ML aparte:** `.venv-ml` con Python 3.12, torch 2.11.0+cu128 (la RTX 5070 necesita CUDA ≥12.8) y `ml/requirements-ml2.txt`, con mlflow 2.19.0 como el servidor.
 - **Bloqueos y pendientes:**
   - **La GPU no responde en WSL** (`nvidia-smi`: «Failed to initialize NVML»). Revisar el driver NVIDIA de Windows (≥570) y `wsl --update`. Ojo: reiniciar WSL para Docker y OpenCTI.
-  - **Decidir qué hacer con la carga de OpenCTI:** la tasa ya está medida, así que se puede parar a medias, dejarla correr o añadir workers (la comparación sería con otra configuración).
+  - ~~Decidir qué hacer con la carga de OpenCTI~~: terminó sola durante la noche.
+  - **F4.2:** medir el valor añadido sobre el feed completo y pasar 2–3 informes por el conector de documentos.
   - **ML-2:** crear el entorno, entrenar con 3 semillas cada modelo, analizar errores y hacer la evaluación sobre el corpus (perfil de APT29).
 - **Archivos tocados:**
   - `tfg-ciberconciencia/`:
