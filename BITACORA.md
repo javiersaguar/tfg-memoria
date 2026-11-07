@@ -1544,3 +1544,51 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - `tfg-ciberconciencia/`: `cti/extract/{entrenar.py,resumen.py}`, `.gitignore`, `docs/ROADMAP.md`;
   - `data/ml2/{modelos,logs,resultados}/`, fuera de git;
   - esta entrada.
+
+### 2026-11-07 (3) — ML-2: significación, errores por técnica y combinación con el diccionario
+- **Con qué/quién:** Javier (pidió los cuatro pasos: significación, errores, combinación, perfil de APT29); Claude Code (scripts, análisis y esta entrada).
+- **Hecho:**
+  - `cti/extract/predecir.py`: probabilidades de dev y prueba de los 6 modelos guardados (solo inferencia). Reproducen el F1 de prueba del entrenamiento.
+  - `cti/extract/analisis.py`: remuestreo emparejado por informe, errores por técnica, confusiones, ejemplos y combinación con el diccionario elegida en desarrollo.
+- **Resultados:**
+  - **SecureBERT 2.0 supera a ModernBERT de forma significativa:** +0,034 de F1 por frase, IC 95 % [+0,011, +0,058]; +0,050 por informe [+0,027, +0,073].
+  - Los dos modelos superan al diccionario con intervalos lejos del cero.
+  - **Frecuencia:** Spearman 0,61. El diccionario gana en técnicas con menos de 20 frases de entrenamiento; el modelo, a partir de ahí.
+  - Confusiones entre técnicas vecinas de la misma cadena (intérprete/phishing, codificación/ofuscación/canal cifrado).
+  - Parte de los falsos positivos parecen huecos de anotación: falta revisarlos a mano.
+- **Problema metodológico:**
+  - Elegida en desarrollo, la combinación con el diccionario pierde (−0,011) y se queda el modelo solo.
+  - En prueba, la unión ganaría +0,037 [+0,016, +0,056] y subiría el F1 macro de 0,30 a 0,46.
+  - Causa: desarrollo no representa bien al diccionario (24 % de menciones explícitas frente a 34 %; F1 del diccionario 0,12 frente a 0,33). Con 16 informes no da para decidir.
+  - **No se cambia la decisión mirando prueba.** Propuesta: validación cruzada por informe sobre entrenamiento + desarrollo para elegir la combinación.
+- **Archivos tocados:**
+  - `tfg-ciberconciencia/`: `cti/extract/{predecir.py,analisis.py}`, `docs/ROADMAP.md`;
+  - `data/ml2/{modelos/*/probs_*.jsonl,resultados/analisis.*}`, fuera de git;
+  - esta entrada.
+
+### 2026-11-07 (4) — ML-2: decisión por validación cruzada y perfil de APT29
+- **Con qué/quién:** Javier (eligió decidir con validación cruzada); Claude Code (scripts, ejecución y esta entrada).
+- **Validación cruzada** (`cti/extract/validacion_cruzada.py`):
+  - 5 bloques por informe sobre entrenamiento + desarrollo (86 informes), unos 4,5 min por bloque en la GPU;
+  - la época (7), el umbral (0,20) y la regla de decisión se fijaron antes de ejecutarla.
+  - **Unión − modelo: +0,040 de F1 por frase, IC 95 % [+0,020, +0,060]**, y +0,076 por informe. Gana en 4 de los 5 bloques.
+  - **Decisión: SecureBERT 2.0 ∪ diccionario podado.** En prueba: F1 por frase 0,590, F1 macro 0,464, F1 por informe 0,713.
+  - Lección: elegir con un desarrollo de 16 informes llevaba a la conclusión contraria.
+- **Perfil de APT29 (6a)** (`cti/extract/informes.py`, `cti/extract/perfil_apt29.py`):
+  - 6 informes de Microsoft. Al limpiarlos quedan 683 frases de análisis, sin las secciones de defensa y producto; las tablas ATT&CK del editor se tratan aparte.
+  - Referencia: G0016 + C0023 + C0024, 72 técnicas; **solo 33 caben en el espacio de etiquetas.**
+  - Frente a esas 33: diccionario F1 0,49 (R 0,33); modelo 0,53 (R 0,39); **unión 0,69 (P 0,83, R 0,60).**
+  - Falla T1195 (supply chain) en SolarWinds. Hay pocas técnicas fuera de la ficha (una plausible y dos errores).
+  - Circularidad declarada: la ficha G0016 sale en parte de estos informes.
+- **Otros:**
+  - instrucciones para un segundo agente que integre day2, Zeek y COMISET en un worktree aparte (`~/proyectos/prompt-agente-datasets-fa.md`);
+  - pendiente: contar los indicadores de ThreatFox que creó OpenCTI antes de pararlo.
+- **Pendiente de ML-2:**
+  - 6b, perfil frente a lo detectado (alertas de day1 y de day2 cuando se cargue);
+  - 6c, parecido entre campañas y grupos;
+  - paso 5, perfiles en STIX hacia el grafo;
+  - revisión manual de los falsos positivos.
+- **Archivos tocados:**
+  - `tfg-ciberconciencia/`: `cti/extract/{validacion_cruzada.py,informes.py,perfil_apt29.py}`, `docs/ROADMAP.md`;
+  - `data/ml2/{cv,resultados/perfil-apt29.json}`, fuera de git;
+  - esta entrada.
