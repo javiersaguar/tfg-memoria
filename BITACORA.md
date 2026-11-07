@@ -1733,3 +1733,19 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - selección: 8 horas por host repartidas por toda su actividad, con un tope de 20.000 registros por hora; salen 110 horas, ~1,75 M de registros y 13 días. Cada hora es un dataset;
   - extracción en marcha; después vienen la preparación (`fa_prepare_sources.py comiset-v2`), la carga aislada y la medida de falsas alarmas.
 - **Archivos tocados:** `detection/{evaluator.py,patterns/v2/*,evaluation/{v2_*,fa_comiset_v2_*,fa_prepare_sources.py,test_fa_runtime.py}}`, `cti/extract/{aumento_attack.py,entrenar.py}`, `docs/ROADMAP.md` (F3.5 y 10a).
+
+### 2026-11-07 (12) — COMISET v2 cargado: 0 campañas en actividad normal y un equipo con Atomic Red Team
+- **Con qué/quién:** Claude Code (extracción, carga en 4 lotes, análisis y esta entrada), con la autorización de Javier para F1–F3.
+- **Extracción:** segunda pasada sobre el ZIP con la selección (110 horas, 1.748.255 registros, todas las celdas presentes, 53 min).
+- **Normalización sin servicios:** 99,91 %. Los 1.514 rechazos son Sysmon sin mapeador (22 DNS, 17 tuberías, 26, 6, 15).
+- **Carga:** 4 lotes aislados (`fa-comiset-v2-b1…b4`) con la semántica de palabras clave v1, como el pipeline oficial. F3 intacto en todos.
+- **Incidencia:**
+  - el lote 4 falló al crear topics: Redpanda limita las particiones a ficheros_abiertos/5 y el contenedor tenía 1024;
+  - se subió `ulimits nofile` a 65536 en el compose y se recreó Redpanda, comprobando que no se perdió ningún mensaje; se borraron los topics vacíos del intento y se repitió el lote;
+  - antes se había probado a bajar `topic_memory_per_partition`, que no era la causa (revertido).
+- **Hallazgo:** `desktop-mh88805` (no sigue el patrón `computerNN.domain.es`) tiene Atomic Red Team instalado y ejecutando pruebas el 05-07-2022 entre las 15 y las 18 h. Concentra 1.183 alertas y las 4 campañas. Se reclasifica como `fa_art` en la verdad conocida.
+- **Medida de falsas alarmas** en los 15 equipos normales (50,6 horas observadas): 0,95 alertas por host-hora, 0,06 de nivel alto y **0 campañas** (cota superior del 95 %: 0,06 por host-hora).
+  - **Las reglas disparan poco sobre actividad normal, y las campañas, nada.**
+  - En el equipo con ataques simulados salen 530 alertas por hora y 4 campañas.
+- **Grafana:** el cuadro 6 separa `fa_art` de la actividad normal.
+- **Archivos tocados:** `detection/evaluation/{fa_comiset_v2_extract.py,fa_comiset_v2_select.py,fa_prepare_sources.py,verdad_datasets.csv}`, `infra/docker-compose.yml` (ulimits de Redpanda), `infra/grafana/generar_dashboards.py` y los JSON regenerados, `docs/ROADMAP.md` (FA.3); fuera de git, `data/external/comiset/{real-v2-censo,real-sample-v2}/` y `data/fa/*comiset-v2*`.
