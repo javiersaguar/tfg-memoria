@@ -1713,3 +1713,23 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - reglas Sigma de red;
   - un conjunto con host y red sincronizados (AIT LDS v2 o CAM-LDS) o una captura propia;
   - T1003, T1548 y T1569 en el espacio de etiquetas de ML-2.
+
+### 2026-11-07 (11) — Mejoras: ajuste v2 de los patrones, aumento de ML-2, reglas de red y COMISET v2 (en curso)
+- **Con qué/quién:** Javier (pidió aplicar las cuatro mejoras propuestas); Claude Code (implementación, mediciones y esta entrada).
+- **1. Ajuste v2 de los patrones** (`detection/patterns/v2/`, `detection/evaluation/v2_evaluacion.sql`). Se mide aparte y las cifras oficiales de F3 no cambian.
+  - **P1:** excluye las alertas de credenciales de `csrss`/`wininit`.
+  - **P2:** el controlador de dominio entra exigiendo ejecución remota o servicio, una herramienta de movimiento lateral como origen (lista positiva, fijada tras ver 3 campañas falsas: optimista) y menos confianza.
+  - **Evaluador Sigma:** las palabras clave pasan a ser subcadena. Hay 1.692 alertas nuevas de 2 de las 11 reglas con palabras clave («Mimikatz Use» 45, antivirus en el log de aplicación 1.647), guardadas aparte en `tfg.alerts_kw`. `TFG_SIGMA_PALABRAS_CLAVE=v1` reproduce la semántica antigua.
+  - **Resultado:** P1 en atómicos pasa de precisión 0,43 a 0,56 y de exhaustividad 0,47 a 0,74. Recupera Mimikatz en memoria con Empire, que era el hueco de F3. Quita 3 campañas falsas. En APT29 day2 todas las campañas son verdaderas: sale la del Golden Ticket (20.B) y P2 recupera el salto a NEWYORK (16.C).
+  - **Para adoptarlo falta:** portarlo a Flink, validarlo con datos no vistos y revisar el volumen de la regla de antivirus.
+- **3. Reglas Sigma de red:** las 12 reglas DNS (genéricas y de Zeek) no disparan sobre los 303 registros DNS de Zeek de APT29, y las demás de Zeek son de SMB, RPC o HTTP, que no tenemos. **Integrarlas no aporta alertas con estos datos.** El conjunto con host y red sincronizados (AIT LDS v2, CAM-LDS) necesita los mapeadores de Linux de FA.4: queda planificado, no se improvisa.
+- **4. ML-2 aumentado** (`cti/extract/aumento_attack.py`):
+  - ejemplos de procedimiento de ATT&CK para T1003, T1548 y T1569, excluyendo APT29;
+  - en las 59 técnicas no empeora (F1 por frase 0,598 frente a 0,589);
+  - el perfil de APT29 ya contiene las tres técnicas y 6b cubre más técnicas de campaña (day1: 8 en el espacio, frente a 5);
+  - hay bastante variación entre semillas.
+- **2. COMISET v2 (en curso):**
+  - **censo completo del ZIP** (933 GB en 59 min): 202,3 M de registros, 16 hosts y 14 días (27-06 a 20-07-2022), con un 99,98 % de Sysmon;
+  - selección: 8 horas por host repartidas por toda su actividad, con un tope de 20.000 registros por hora; salen 110 horas, ~1,75 M de registros y 13 días. Cada hora es un dataset;
+  - extracción en marcha; después vienen la preparación (`fa_prepare_sources.py comiset-v2`), la carga aislada y la medida de falsas alarmas.
+- **Archivos tocados:** `detection/{evaluator.py,patterns/v2/*,evaluation/{v2_*,fa_comiset_v2_*,fa_prepare_sources.py,test_fa_runtime.py}}`, `cti/extract/{aumento_attack.py,entrenar.py}`, `docs/ROADMAP.md` (F3.5 y 10a).
