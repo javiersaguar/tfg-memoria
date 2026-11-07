@@ -1627,3 +1627,31 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - `tfg-ciberconciencia/`: `README.md`, `docs/ROADMAP.md`, `infra/docker-compose.yml`, `cti/extract/detectado.py`;
   - `data/ml2/{detecciones,resultados/detectado.json}`, fuera de git;
   - esta entrada.
+
+### 2026-11-07 (7) — Memoria: F4 en LaTeX, cuerpo recortado y revisión del agente de FA
+- **Con qué/quién:** Javier (pidió llevar ML-2 a la memoria, resumir y mover partes a anexos, y revisar al otro agente); Claude Code (edición LaTeX, revisión y esta entrada).
+- **Memoria:**
+  - **Nueva sección 3.14, «Plano de inteligencia de amenazas»** (`sections/cti.tex`): ATT&CK como referencia común, OpenCTI frente a carga directa y ML-2 (tarea, sistemas, protocolo, resultados, decisión por validación cruzada, falsos positivos y evaluación sobre APT29).
+  - **Nuevo Anexo G, «Detalle de la evaluación de ML-2»** (`anexos/ml2.tex`).
+  - 6 referencias nuevas en `ref.bib`. Licencias al día: ATT&CK v19.2, ThreatFox, AnnoCTR, informes de Microsoft, Neo4j, OpenCTI, PyTorch, Transformers y los dos modelos. Se quita el SecureBERT original, que no se usa.
+  - **Recorte del cuerpo sin perder nada:** nuevo Anexo C, «Detalles de implementación e incidencias técnicas». Al anexo van:
+    - perfiles del entorno, subconjunto OCSF, diseño del esquema, cuadros de mando y evaluador Sigma;
+    - todas las incidencias técnicas;
+    - protocolo del detector de anomalías y contaminación del laboratorio;
+    - aristas de red de P2 y desorden en modo continuo.
+  - En el cuerpo queda un resumen con referencia. Se quitan repeticiones con los anexos de Flink y del esquema de campaña.
+  - **Cuerpo: de 49 páginas sin F4 a 46 con F4** (94 en total). Si el límite es 60, quedan unas 14 para F5–F7. Compila sin errores ni referencias rotas.
+  - Copia de los ficheros previos en el scratchpad de la sesión.
+- **Revisión del agente de FA (worktree `fa-datasets`):**
+  - No modificó ningún fichero existente: todo es nuevo. Sus 16 tests pasan y no hay operaciones destructivas.
+  - Hecho offline: day2 extraído (587.286 registros, 99,69 % normalizable), Zeek preparado (2.088 eventos), adaptador de COMISET (99.749 de 100.000) y auditoría de campos.
+  - Hecho con servicios: foto de F3 (110 datasets, 2.740 alertas, 55 campañas).
+  - **Aún no ha cargado nada.** Espera la aprobación de la verdad de day2 (40 técnicas) y de los comandos de carga.
+  - **Hallazgos a tener en cuenta:**
+    - los relojes de Zeek no coinciden con los de host (día anterior), así que el cruce con P2 no puede ser temporal;
+    - el piloto de COMISET cubre unos 6 minutos por host y no una hora, y el segundo host no tiene canales soportados. Para medir falsas alarmas hace falta la v2;
+    - su job FA particiona por host y el de F3 por identidad. Conviene igualarlo si los resultados se van a comparar con F3.
+- **Pendiente:**
+  - Javier valida la revisión de falsos positivos de ML-2;
+  - 6b con day2 cuando se cargue;
+  - confirmar el límite de páginas.

@@ -1,0 +1,189 @@
+\chapter{Detalle de la evaluación de ML-2}
+\label{anx:ml2}
+
+Este anexo completa la Sección~\ref{sec:ml2} con la construcción del conjunto de datos, la
+configuración de los entrenamientos, los resultados completos y la revisión manual de falsos
+positivos.
+
+\section{Conjunto de datos}
+
+Cada mención de técnica marcada en una frase de AnnoCTR se empareja, por orden, con su enlace a
+ATT\&CK del mismo informe. Casan 3.374 de 3.375 menciones. Los identificadores se normalizan a la
+técnica padre vigente de la v19.2: se traducen 30 revocados y se descartan 18 de ATT\&CK Mobile o
+desconocidos. Los 280 informes sin anotar de AnnoCTR no se usan.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|r|r|r|}
+\hline
+\textbf{Partición} & \textbf{Informes} & \textbf{Frases} & \textbf{Frases con técnica} \\
+\hline
+Entrenamiento & 70 & 7.570 & 1.499 \\
+Desarrollo & 16 & 1.550 & 335 \\
+Prueba & 34 & 3.059 & 754 \\
+\hline
+\end{tabular}
+\caption{Particiones de AnnoCTR, tal como se publican.}
+\end{table}
+
+\section{Configuración de los entrenamientos}
+
+Los dos modelos se afinan con la misma configuración: clasificación multietiqueta con pérdida de
+entropía cruzada binaria, AdamW (tasa de aprendizaje $3\cdot10^{-5}$, decaimiento 0,01, 10\,\% de
+calentamiento lineal), lotes de 32 frases de hasta 128 \textit{tokens}, 8 épocas, precisión mixta
+\texttt{bfloat16} y recorte del gradiente a 1. En cada época se calcula en desarrollo el F1 por
+frase para 18 umbrales (de 0,05 a 0,90) y se guarda la mejor combinación de época y umbral. Las
+épocas elegidas van de 4 a 7 y los umbrales de 0,10 a 0,25. El entorno es Python 3.12 con PyTorch
+2.11 (CUDA 12.8) y Transformers 5.20 sobre una RTX~5070 de 8\,GB.
+
+\section{Resultados completos}
+
+\begin{table}[H]
+\centering
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{|l|c|c|c|c|c|}
+\hline
+\textbf{Sistema (prueba)} & \textbf{P frase} & \textbf{R frase} & \textbf{F1 frase} & \textbf{F1 macro} & \textbf{F1 informe} \\
+\hline
+Diccionario sin poda & 0,203 & 0,219 & 0,211 & 0,325 & 0,391 \\
+Diccionario podado & 0,720 & 0,214 & 0,330 & 0,349 & 0,490 \\
+ModernBERT-base & 0,568 & 0,480 & 0,519 $\pm$ 0,010 & 0,262 & 0,620 $\pm$ 0,041 \\
+SecureBERT 2.0 & 0,612 & 0,506 & 0,553 $\pm$ 0,019 & 0,301 & 0,670 $\pm$ 0,026 \\
+\hline
+\end{tabular}%
+}
+\caption{Resultados en prueba, con media y desviación de tres semillas.}
+\end{table}
+
+\begin{table}[H]
+\centering
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Comparación (prueba)} & \textbf{Dif. F1 frase [IC 95\,\%]} & \textbf{Dif. F1 informe [IC 95\,\%]} \\
+\hline
+SecureBERT 2.0 $-$ ModernBERT & +0,034 [+0,011, +0,058] & +0,050 [+0,027, +0,073] \\
+SecureBERT 2.0 $-$ diccionario & +0,223 [+0,132, +0,329] & +0,179 [+0,071, +0,317] \\
+ModernBERT $-$ diccionario & +0,189 [+0,092, +0,295] & +0,130 [+0,020, +0,267] \\
+\hline
+\end{tabular}%
+}
+\caption{Diferencias con remuestreo emparejado por informe (10.000 muestras).}
+\end{table}
+
+\section{Decisión de la combinación}
+
+\textbf{Reglas, fijadas antes de ejecutar la validación cruzada:}
+\begin{itemize}
+    \item cinco bloques por informe sobre los 86 de entrenamiento y desarrollo;
+    \item SecureBERT~2.0 con la época y el umbral medianos de los entrenamientos anteriores (7 y 0,20), sin elegir nada dentro de cada vuelta;
+    \item la poda del diccionario y el corte de «técnica rara» se calculan solo con los bloques de entrenamiento de cada vuelta;
+    \item la combinación se adopta solo si mejora y el remuestreo da menos de un 5\,\% de diferencias nulas o negativas.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{|l|c|c|c|c|c|}
+\hline
+\textbf{Variante (86 informes)} & \textbf{F1 frase} & \textbf{F1 macro} & \textbf{R explícitas} & \textbf{R implícitas} & \textbf{F1 informe} \\
+\hline
+Diccionario & 0,249 & 0,278 & 0,327 & 0,096 & 0,479 \\
+Modelo & 0,481 & 0,206 & 0,600 & 0,360 & 0,620 \\
+Modelo $\cup$ diccionario en técnicas con $<$20 frases & 0,509 & 0,373 & 0,717 & 0,372 & 0,690 \\
+\textbf{Modelo $\cup$ diccionario} & \textbf{0,520} & \textbf{0,382} & \textbf{0,771} & \textbf{0,387} & \textbf{0,695} \\
+\hline
+\end{tabular}%
+}
+\caption{Validación cruzada por informe. Unión frente a modelo: +0,040 de F1 por frase
+[+0,020, +0,060] y +0,076 por informe [+0,042, +0,109].}
+\end{table}
+
+En desarrollo, el diccionario saca un F1 por frase de 0,12, frente a 0,33 en prueba y 0,25 en la
+validación cruzada. Desarrollo tiene un 24\,\% de menciones explícitas y prueba un 34\,\%.
+
+\section{Errores por frecuencia}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|r|c|c|}
+\hline
+\textbf{Frases de entrenamiento} & \textbf{Técnicas} & \textbf{F1 medio, modelo} & \textbf{F1 medio, diccionario} \\
+\hline
+5--9 & 16 & 0,120 & 0,349 \\
+10--19 & 13 & 0,247 & 0,472 \\
+20--49 & 13 & 0,466 & 0,294 \\
+50 o más & 7 & 0,558 & 0,222 \\
+\hline
+\end{tabular}
+\caption{F1 por técnica según su frecuencia en entrenamiento (SecureBERT~2.0, tres semillas).}
+\end{table}
+
+Las confusiones más frecuentes del modelo enfrentan técnicas vecinas de una misma cadena:
+intérprete de órdenes con \textit{phishing}, transferencia de herramientas con intérprete,
+ejecución por el usuario con \textit{phishing}, y codificación de datos con ofuscación o con canal
+cifrado.
+
+\section{Revisión manual de falsos positivos}
+
+Se revisó una muestra aleatoria fija de 60 de los 270 falsos positivos del sistema adoptado en
+prueba (una semilla), en tres clases:
+\begin{itemize}
+    \item \textbf{H, hueco de anotación:} la frase describe o nombra la técnica y AnnoCTR no la anotó;
+    \item \textbf{D, dudoso:} solo es correcta con el contexto del informe, o la técnica es vecina de la anotada;
+    \item \textbf{E, error:} la frase no describe la técnica.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|r|r|r|}
+\hline
+\textbf{Clase} & \textbf{Total} & \textbf{Del modelo} & \textbf{Del diccionario} \\
+\hline
+H & 25 (42\,\%, IC 95\,\% 30--54\,\%) & 16 & 9 \\
+D & 10 (17\,\%) & 10 & 0 \\
+E & 25 (42\,\%) & 18 & 7 \\
+\hline
+\end{tabular}
+\caption{Clasificación de la muestra de falsos positivos.}
+\end{table}
+
+Contando la clase H como acierto, la precisión por frase pasa de 0,61 a 0,77 (0,73--0,82); con la
+clase D, a 0,84. La exhaustividad no cambia, porque la revisión no busca técnicas que el sistema
+tampoco ve. Los huecos típicos son filas de tablas de ATT\&CK y técnicas nombradas en listas,
+descargas de herramientas, activación de macros y órdenes de PowerShell o \texttt{rundll32}
+literales. Los errores del diccionario vienen de nombres genéricos de subtécnica que
+sobrevivieron a la poda, como «Web Services» o «Exploits». Se informa como oficial la precisión
+medida y la corregida como estimación.
+
+\section{Perfil de APT29}
+
+De los seis informes de Microsoft se descartan las secciones de mitigación, detección, consultas
+de búsqueda, productos e indicadores, y todo lo que sigue a «Related posts». Quedan 683 frases de
+análisis. Las tablas «MITRE ATT\&CK techniques observed» del propio editor se excluyen del perfil
+principal, porque alimentan en parte la ficha del grupo.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|r|c|c|c|}
+\hline
+\textbf{Sistema} & \textbf{Técnicas} & \textbf{Precisión} & \textbf{Exhaustividad} & \textbf{F1} \\
+\hline
+Diccionario & 12 & 0,92 & 0,33 & 0,49 \\
+SecureBERT 2.0 & 16 & 0,81 & 0,39 & 0,53 $\pm$ 0,09 \\
+\textbf{SecureBERT 2.0 $\cup$ diccionario} & 24 & 0,83 & 0,60 & 0,69 $\pm$ 0,05 \\
+\hline
+\end{tabular}
+\caption{Perfil de APT29 frente a las 33 técnicas de G0016 y sus campañas que caben en el espacio
+de etiquetas (técnicas con al menos una frase).}
+\end{table}
+
+El modelo no extrae el compromiso de la cadena de suministro (\texttt{T1195}) del informe de
+SolarWinds, pese a tener 20 frases de entrenamiento; el diccionario sí. En el paquete STIX, cada
+técnica del perfil es una relación \texttt{uses} de G0016 con su confianza, el número de frases y
+de informes que la respaldan, el método que la extrajo y una frase de evidencia. La confianza es
+la probabilidad máxima del modelo; cuando la técnica solo la extrae el diccionario, se usa 61, su
+precisión en la validación cruzada.

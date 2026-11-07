@@ -123,12 +123,8 @@ del patrón; las flechas, las transiciones reconocidas por \texttt{MATCH\_RECOGN
 \label{fig:dos-niveles}
 \end{figure}
 
-La implementación encontró además otras restricciones del motor, que condicionan la forma
-de escribir los patrones: la cláusula \texttt{DEFINE} no admite subconsultas, por lo que la
-lógica sobre listas de técnicas se precalcula en la proyección; \texttt{COUNT(DISTINCT)} no
-está permitido en \texttt{MEASURES}; y \texttt{WITHIN} acota la duración total de la
-coincidencia y no el hueco entre elementos, por lo que la ventana se expresa como condición
-en \texttt{DEFINE}.
+La implementación encontró además otras restricciones del motor que condicionan la forma de
+escribir los patrones; se recogen en el Anexo~\ref{anx:patrones}.
 
 Una restricción adicional determina la arquitectura. \texttt{MATCH\_RECOGNIZE} exige ordenar
 por un atributo de tiempo de evento, y Flink lo pierde al atravesar uniones y agregaciones.
@@ -177,14 +173,10 @@ P2 reconoce el salto de un equipo a otro: una conexión de red hacia el destino 
 ejecución remota en él. Es el primer patrón que \textbf{cruza equipos}, y requiere
 construir antes las \textbf{aristas} de red a partir de los eventos normalizados.
 
-La construcción de las aristas destapó varios problemas que no producían error alguno.
-Bajo la misma clase OCSF de actividad de red conviven las conexiones lógicas de Sysmon y
-cada flujo permitido por el cortafuegos de Windows; filtrar por clase daba 3.480 conexiones
-WinRM donde el fichero de origen tiene 12. El mapa de direcciones IP a equipos, si cuenta
-también los registros entrantes, se corrompe en silencio: un equipo llegó a ganar su propia
-dirección por un solo voto. Se resolvió contando solo conexiones salientes, en las que la
-dirección de origen es por definición la propia. Y la dirección de bucle local escrita sin
-abreviar fabricaba aristas falsas hasta que se normalizó su grafía.
+Construirlas destapó tres problemas que no producían error: flujos del cortafuegos mezclados con
+conexiones lógicas, un mapa de direcciones IP a equipos que se corrompía al contar registros
+entrantes, y aristas falsas por la grafía de la dirección de bucle local
+(Anexo~\ref{anx:incidencias}).
 
 Con el mapa corregido y el controlador de dominio identificado por su comportamiento y
 excluido, quedan 39 aristas: 22 hacia el controlador y \textbf{17 de SCRANTON a NASHUA}
@@ -249,44 +241,21 @@ Flink reproduce exactamente su oráculo.}
 
 \subsection{Esquema común de campaña}
 
-Las campañas de los tres patrones se emiten con un \textbf{esquema común}, que es lo que
-consumirán el grafo de ataque, la priorización y la interfaz. Por coherencia con el resto
-del sistema, una campaña es un hallazgo estándar \textbf{OCSF 1.5.0 «Detection Finding»}
-(clase 2004). Todo lo que el estándar contempla va en sus campos: las alertas relacionadas,
-las técnicas, la confianza y el intervalo temporal. Lo que no contempla va en una extensión
-propia documentada: las \textbf{etapas ordenadas}, los \textbf{factores de confianza}, cuya
-suma es la confianza publicada, los equipos con su papel y las métricas de cada patrón. Las
-técnicas se publican sin táctica asociada, porque las alertas traen ambas listas sin
-emparejar y emparejarlas sería inventar.
-
-Dos reglas garantizan que el resultado sea reproducible. La identidad de cada campaña es un
-resumen criptográfico de su conjunto de datos, patrón, clave y hora de inicio, de modo que
-reprocesar el corpus produce los mismos identificadores y la tabla de destino sobrescribe en
-lugar de duplicar. Las etapas se ordenan por el segundo de su primera evidencia y, dentro
-del mismo segundo, por el orden lógico del patrón, porque parte de las horas de origen solo
-tienen resolución de segundo. El proceso que vuelca las campañas al almacén
-\textbf{valida cada documento} y se detiene ante el primero que no cumpla el esquema. El
-almacén contiene hoy 15 campañas: 11 de P1, 1 de P2 y 3 de P3. El
-Anexo~\ref{anx:esquema} detalla el esquema con un ejemplo completo.
+Las campañas de los tres patrones se emiten con un \textbf{esquema común}, que consumirán el
+grafo, la priorización y la interfaz: un hallazgo estándar \textbf{OCSF 1.5.0 «Detection Finding»}
+(clase 2004) con una extensión propia para lo que el estándar no contempla, como las
+\textbf{etapas ordenadas} y los \textbf{factores de confianza}, cuya suma es la confianza publicada.
+La identidad de cada campaña es determinista, de modo que reprocesar el corpus sobrescribe en lugar
+de duplicar, y cada documento se valida antes de volcarlo. El almacén contiene 15 campañas: 11 de
+P1, 1 de P2 y 3 de P3 (esquema y ejemplo en el Anexo~\ref{anx:esquema}).
 
 \subsection{Validación en modo continuo}
 \label{sec:pilarA-streaming}
 
-La validación anterior se realizó con fuentes acotadas. En modo continuo, la marca de agua
-descarta sin aviso los eventos que llegan con más retraso del admitido, por lo que antes de
-lanzar los patrones se \textbf{midió el desorden} de llegada:
-
-\begin{itemize}
-    \item Dentro de un mismo conjunto de datos, las alertas llegan con hasta 293\,s de
-    retraso respecto a otras posteriores, por efecto de los detectores en paralelo. Con una
-    marca de agua de 30\,s se perderían 220 alertas (18\,\%); con 5 minutos, ninguna. La
-    cifra está inflada porque el corpus se reproduce decenas de veces más rápido que el
-    tiempo real.
-    \item Los \textit{topics} intermedios, escritos inicialmente sin ordenar, habrían
-    llegado «tarde» en un 74--78\,\%. Se decidió publicarlos en orden de tiempo de evento.
-    \item Al reproducir a la vez capturas de distintos años, el desorden entre conjuntos de
-    datos alcanza años. Es un artefacto de la reproducción que no existe en producción.
-\end{itemize}
+En modo continuo, la marca de agua descarta sin aviso los eventos que llegan con más retraso
+del admitido, así que antes se \textbf{midió el desorden} de llegada (Anexo~\ref{anx:incidencias}).
+Una marca de agua de 5 minutos no pierde ninguna alerta, y los \textit{topics} intermedios se
+publican en orden de tiempo de evento.
 
 Con los \textit{topics} intermedios ordenados, el segundo nivel se expresa con una ventana de
 sesión y los tres patrones dan en flujo \textbf{exactamente el mismo resultado} que por lotes:
@@ -295,35 +264,14 @@ sesión no emite cada campaña una sola vez al cerrarse, sino que la \textbf{act
 transición nueva. Para detectar es una ventaja, porque la campaña existe desde su primera
 transición, pero obliga a emitirla hacia un destino que admita actualizaciones.
 
-\subsection{Incidencia: la hora de los eventos era la de recogida}
+\subsection{Identidad y tiempo de los eventos}
 
-El primer día de APT29 no incluye el campo de hora de creación del evento, y la
-normalización recurría a la marca del colector, que corresponde al instante de
-\textbf{recepción}. El desfase medido sobre los eventos que sí traen la hora real tiene una
-mediana de 6,2\,s, un percentil 95 de 74,9\,s y un máximo de 101,2\,s. Lo grave es su
-dispersión, de 26,7\,s: los eventos se reordenaban entre sí y no había desplazamiento
-constante que corregir.
-
-La corrección establece una cadena de prioridad entre las fuentes de tiempo disponibles, con
-la conversión de zona horaria derivada por conjunto de datos, y marca cada evento con la
-fuente empleada. Ninguna fuente es fiable en todos los conjuntos: la hora UTC de Sysmon, la
-más precisa en APT29, va desviada 19 horas en las capturas de robo de credenciales. Con la
-hora corregida desapareció una inversión imposible documentada hasta entonces, en la que el
-proceso remoto aparecía tres segundos antes que la conexión que lo provoca: la conexión va
-ahora 116\,ms antes. Queda una limitación del dato de origen: el 26,6\,\% de los eventos de
-APT29 solo tiene resolución de segundo.
-
-\subsection{Incidencia: la identidad de los eventos y de las alertas}
-
-Durante esta fase se comprobó que el 15\,\% de los eventos normalizados de APT29 era idéntico
-byte a byte a otro, porque el evento OCSF no conservaba el número de registro de origen. Dos
-ocurrencias distintas con los mismos campos se volvían indistinguibles, y las alertas
-duplicadas por un reprocesado no se podían separar de las legítimas. Se resolvió dando
-\textbf{identidad determinista} a ambos: el evento conserva su número de registro (o, si la
-fuente no lo aporta, el ordinal de la línea en el fichero), la alerta se identifica por el
-resumen del evento y la regla, y las tablas del almacén deduplican por esa identidad. La
-comprobación final fue recuperar exactamente las 741 alertas documentadas para APT29 y las
-cifras de eventos de cada conjunto de datos contadas contra su fichero de origen.
+Esta fase destapó dos defectos de los datos que no producían error. En el primer día de APT29
+la hora de los eventos era la de \textbf{recogida}, con una dispersión de 26,7\,s que los
+reordenaba, y el 15\,\% de los eventos normalizados era idéntico byte a byte a otro. Se
+corrigieron con una cadena de prioridad entre fuentes de tiempo y con \textbf{identidad
+determinista} de eventos y alertas, comprobada al recuperar exactamente las 741 alertas
+documentadas (Anexo~\ref{anx:incidencias}).
 
 \subsection{Evaluación de la fase: reducción de alertas y falsos positivos}
 \label{sec:pilarA-evaluacion}

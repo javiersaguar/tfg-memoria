@@ -1,0 +1,391 @@
+\chapter{Detalles de implementación e incidencias técnicas}
+\label{anx:implementacion}
+
+Este anexo recoge el detalle de implementación que el Capítulo~\ref{cap:desarrollo} resume, y las
+incidencias técnicas encontradas durante el desarrollo. Se documentan porque varias de ellas no
+producían ningún error visible y habrían invalidado los resultados sin que nada lo delatara.
+
+\section{Entorno de desarrollo}
+\label{anx:entorno}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Perfil} & \textbf{Servicios} & \textbf{Uso} \\
+\hline
+\texttt{core} & Bus de eventos y consola & Siempre activo \\
+\texttt{stream} & Motor de procesamiento & Desarrollo de detección \\
+\texttt{store} & Almacén analítico & Consulta y evaluación \\
+\texttt{graph} & Base de datos de grafos & Trabajo sobre el Pilar B \\
+\texttt{cti} & Plataforma de inteligencia & Ingesta de CTI \\
+\texttt{observability} & Métricas y visualización & Monitorización \\
+\hline
+\end{tabular}
+\caption{Perfiles de despliegue definidos.}
+\label{tab:perfiles}
+\end{table}
+
+\subsection{Incidencias del entorno}
+
+La construcción del entorno presentó una cadena de incompatibilidades derivadas de emplear
+versiones muy recientes del sistema operativo y del intérprete de Python, que se documentan
+por su valor práctico:
+
+\begin{itemize}
+    \item La distribución de Linux empleada es posterior a las versiones para las que existen
+    repositorios oficiales de algunos componentes, lo que obligó a fijar explícitamente el
+    repositorio de la última versión con soporte a largo plazo disponible.
+    \item La versión de Python del sistema (3.14) carece de paquetes precompilados para las
+    bibliotecas de integración con el motor de procesamiento, cuyas dependencias no soportan
+    aún esa versión. Se resolvió mediante un entorno virtual independiente con Python 3.12,
+    manteniendo el entorno principal para el resto del código.
+    \item La biblioteca de integración requiere una máquina virtual Java en el anfitrión, no
+    solo en los contenedores, lo que no resulta evidente hasta que falla la primera
+    invocación.
+\end{itemize}
+
+\section{Selección del subconjunto del esquema}
+
+OCSF define un número elevado de clases de evento, de las cuales solo un subconjunto resulta
+pertinente para la telemetría considerada. La selección se realizó a partir de las clases
+efectivamente presentes en los conjuntos de datos, y se organizó en tres oleadas de
+implementación para permitir que el sistema fuese funcional desde la primera.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|l|}
+\hline
+\textbf{Clase OCSF} & \textbf{\texttt{class\_uid}} & \textbf{Fuentes que absorbe} \\
+\hline
+File System Activity & 1001 & Creación y escritura de ficheros \\
+Module Activity & 1005 & Carga de bibliotecas dinámicas \\
+Scheduled Job Activity & 1006 & Tareas programadas y servicios \\
+Process Activity & 1007 & Creación, terminación y acceso a procesos \\
+Event Log Activity & 1008 & Manipulación del registro de auditoría \\
+Script Activity & 1009 & Ejecución de guiones \\
+Account Change & 3001 & Alta y modificación de cuentas \\
+Authentication & 3002 & Inicios de sesión \\
+Authorize Session & 3003 & Asignación de privilegios especiales \\
+Group Management & 3006 & Modificación de pertenencia a grupos \\
+Network Activity & 4001 & Conexiones de red \\
+DNS Activity & 4003 & Resolución de nombres \\
+\hline
+\end{tabular}
+\caption{Subconjunto de clases OCSF adoptado.}
+\label{tab:ocsf}
+\end{table}
+
+Merece una mención específica el tratamiento de los eventos de \textbf{registro de Windows}.
+El esquema base de OCSF no define una clase específica para esta categoría, por lo que se
+optó por asignarlos a la clase más próxima conservando la totalidad del detalle original en
+el campo \texttt{unmapped}. La decisión se documenta como tal, dado que una futura extensión
+del esquema podría cubrir este caso de forma más precisa.
+
+
+\section{Diseño del esquema}
+
+El diseño adopta una estrategia \textbf{híbrida}. Los campos que participan habitualmente en
+filtros y agregaciones se promocionan a columnas dedicadas con tipos específicos, mientras que
+el evento OCSF completo se conserva íntegro en una columna adicional. De este modo se obtiene
+el rendimiento de una base de datos columnar sobre los accesos frecuentes sin renunciar a la
+flexibilidad de disponer del dato completo cuando se requiere un campo no previsto.
+
+Las decisiones de modelado más relevantes son las siguientes:
+
+\begin{itemize}
+    \item La \textbf{clave de ordenación} se establece sobre el par (host, tiempo), que
+    corresponde al patrón de acceso dominante en la investigación de incidentes: qué ocurrió
+    en una máquina concreta durante una ventana temporal determinada.
+    \item El \textbf{particionado} se realiza por mes, lo que facilita la gestión y el purgado
+    del almacén por rangos temporales.
+    \item Las \textbf{señales de detección} precalculadas durante la normalización se
+    materializan como columnas booleanas, lo que reduce las consultas de investigación sobre
+    comportamiento adversario a filtros triviales.
+    \item Se aplican \textbf{codificaciones específicas} por columna: diferencial más
+    compresión para las marcas temporales, que presentan valores próximos entre sí, y
+    diccionario para los campos de baja cardinalidad como nombres de host o de clase.
+\end{itemize}
+
+
+\section{Observabilidad}
+\label{anx:observabilidad}
+
+La recolección de métricas se realiza mediante un sistema de series temporales que consulta
+periódicamente los puntos de exposición de cada componente. Se instrumentaron el bus de
+eventos, ambos nodos del motor de procesamiento y el almacén analítico, activando en cada
+caso el mecanismo de exposición correspondiente.
+
+Sobre esa base se construyeron tres cuadros de mando, aprovisionados de forma
+\textbf{declarativa} —definidos como ficheros de configuración versionados, no configurados
+manualmente— para dar cumplimiento al requisito de reproducibilidad RNF1:
+
+\begin{description}
+    \item[Salud del \textit{pipeline}] Estado del bus de eventos, volumen por \textit{topic},
+    recursos consumidos por el motor de procesamiento y actividad del almacén analítico.
+    Verifica el correcto funcionamiento de la infraestructura.
+    \item[Panel de seguridad] Distribución de eventos por clase OCSF, señales de detección
+    activas, cronología del ataque reconstruida y procesos más frecuentes. Constituye la
+    vista orientada al analista.
+    \item[Cobertura y calidad de datos] Cobertura de normalización, distribución por canal y
+    tipo de evento, conjuntos de datos cargados e indicadores de integridad temporal. Respalda
+    las métricas reportadas en la evaluación.
+\end{description}
+
+
+\section{Evaluador de reglas Sigma}
+\label{anx:evaluador-sigma}
+
+\subsection{Alcance de los modificadores soportados}
+
+El formato Sigma admite un conjunto amplio de modificadores que alteran la comparación de
+valores. Implementarlos todos constituiría un proyecto en sí mismo, por lo que se acotó el
+alcance a partir de una medición sobre el repositorio completo de reglas.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|r|r|}
+\hline
+\textbf{Modificador} & \textbf{Apariciones} & \textbf{Acumulado} \\
+\hline
+\texttt{contains}    & 3.362 & 45{,}1\,\% \\
+\texttt{endswith}    & 2.494 & 78{,}5\,\% \\
+\texttt{all}         &   854 & 90{,}0\,\% \\
+\texttt{startswith}  &   431 & 95{,}8\,\% \\
+\texttt{re}          &   155 & 97{,}9\,\% \\
+\hline
+Resto (\texttt{windash}, \texttt{cidr}, otros) & 158 & 100\,\% \\
+\hline
+\end{tabular}
+\caption{Frecuencia de uso de los modificadores de Sigma en el repositorio público.}
+\label{tab:modificadores}
+\end{table}
+
+Cinco modificadores cubren el 97,9\,\% de los usos reales. El evaluador los implementa
+todos, junto con la lógica de composición de condiciones (conjunción, disyunción, negación
+y cuantificación). Las construcciones no soportadas se detectan explícitamente y la regla
+correspondiente se omite, en lugar de producir una evaluación silenciosamente incorrecta.
+
+\subsection{Optimización}
+
+La implementación inicial reconstruía el árbol de condiciones de cada regla en cada
+evaluación. Sobre un conjunto de 2.093 reglas, ello suponía repetir más de 385.000 veces un
+trabajo que puede realizarse una sola vez por regla.
+
+Se introdujeron dos optimizaciones:
+
+\begin{itemize}
+    \item \textbf{Precompilación}: el árbol de condiciones se construye una única vez al
+    cargar la regla.
+    \item \textbf{Encaminamiento por tipo de evento}: cada regla declara la categoría de
+    registro sobre la que aplica, lo que permite descartar de antemano aquellas que no pueden
+    coincidir con el tipo del evento evaluado.
+\end{itemize}
+
+El efecto combinado se muestra en la Tabla~\ref{tab:optimizacion}. La comprobación esencial
+es que el conjunto de detecciones producidas permaneció \textbf{idéntico}: se trata de una
+optimización, no de una aproximación.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|r|r|r|}
+\hline
+\textbf{Versión} & \textbf{Tiempo} & \textbf{Mejora} & \textbf{Detecciones} \\
+\hline
+Sin optimizar & 108{,}6 s & --- & 10 \\
+Optimizada    & 1{,}49 s & 73$\times$ & 10 \\
+\hline
+\end{tabular}
+\caption{Efecto de las optimizaciones sobre el conjunto de referencia (184 eventos, 2.093 reglas).}
+\label{tab:optimizacion}
+\end{table}
+
+
+\section{Detector de anomalías: protocolo y controles}
+\label{anx:anomalias}
+
+\subsection{Protocolo experimental}
+
+El entrenamiento emplea Isolation Forest \cite{isolationforest} sobre la implementación de
+scikit-learn \cite{scikitlearn}, y se comparan dos estrategias:
+
+\begin{enumerate}
+    \item \textbf{Entrenamiento con ventanas limpias}: únicamente aquellas sin indicios
+    objetivos de actividad maliciosa. Corresponde al planteamiento canónico de aprender el
+    comportamiento normal.
+    \item \textbf{Entrenamiento con contaminación}: todas las ventanas, declarando la
+    proporción esperada de anomalías.
+\end{enumerate}
+
+Se incorpora asimismo una variante \textbf{supervisada} mediante bosques aleatorios, con y sin
+compensación del desbalanceo por SMOTE \cite{smote}.
+
+El conjunto de evaluación se mantiene \textbf{estrictamente separado} del de entrenamiento: se
+reserva un escenario completo, para el que se dispone de las alertas de la capa de reglas como
+referencia externa. Todos los experimentos se registran en MLflow \cite{mlflow} con sus
+parámetros, métricas y semillas, garantizando su reproducibilidad.
+
+\subsection{Controles experimentales}
+
+Junto a los modelos se incorporan dos controles cuya función es delimitar el mérito real de
+los resultados:
+
+\begin{itemize}
+    \item \textbf{Control de volumen}: un modelo entrenado con una \textbf{única}
+    característica, el número de eventos de la ventana. Si alcanzase un rendimiento comparable
+    al del modelo completo, quedaría demostrado que la aportación del enfoque multivariante es
+    marginal.
+    \item \textbf{Ablación de características potencialmente circulares}: se excluyen aquellas
+    que participan en la definición de «ventana limpia», para descartar que el modelo
+    aproveche información derivada de su propio criterio de entrenamiento.
+\end{itemize}
+
+\section{Contaminación del conjunto del laboratorio}
+\label{anx:laboratorio}
+
+La revisión del primer conjunto destapó tres \textbf{fuentes de contaminación} que habrían
+invalidado el etiquetado sin producir error alguno:
+
+\begin{itemize}
+    \item El registro de módulos de PowerShell suponía el 59\,\% del conjunto y era casi
+    íntegramente ruido interno del propio marco de pruebas, repartido por igual entre ambas
+    clases. Se desactivó y se conservó solo el registro de bloques de guion, que captura el
+    contenido real.
+    \item Las llamadas de contexto internas del ejecutor de pruebas (\texttt{whoami.exe},
+    \texttt{hostname.exe}) suponían el 62\,\% de las muestras maliciosas a nivel de proceso.
+    Tras filtrarlas, las muestras maliciosas pasaron de 1.052, con una sola ventana que
+    concentraba el 78\,\%, a 147 bien repartidas entre técnicas.
+    \item Un servicio del sistema escribía telemetría de compatibilidad de aplicaciones
+    durante las ventanas de ataque, lo que añadía 16 filas mal etiquetadas.
+\end{itemize}
+
+\section{Incidencias técnicas}
+\label{anx:incidencias}
+
+\subsection{Incidencia: sincronización temporal entre fuentes}
+\label{sec:incidencia_temporal}
+
+Durante la validación se detectó un error de consecuencias potencialmente graves que no
+producía fallo alguno. Los dos canales de telemetría considerados exponen campos temporales
+distintos: la telemetría extendida incorpora un campo con la marca de tiempo en formato UTC
+además del campo estándar, mientras que la auditoría nativa solo dispone de este último. La
+implementación inicial priorizaba el campo aparentemente más preciso cuando estaba
+disponible.
+
+El resultado fue un desfase de dieciséis horas entre ambos canales que reordenaba
+completamente la secuencia reconstruida: la etapa final del ataque —el borrado del registro de
+auditoría— aparecía como la primera. El error no generaba ningún rechazo ni advertencia, y
+solo se hizo visible al inspeccionar la coherencia lógica de la cadena de eventos.
+
+La corrección consistió en apoyar la normalización en el campo temporal \textbf{común y
+coherente} entre fuentes, en lugar del más específico. La lección resulta generalizable: en un
+sistema que correlaciona múltiples fuentes, la homogeneidad del criterio temporal prevalece
+sobre la precisión nominal de cada fuente considerada por separado.
+
+Tras la corrección, la secuencia reconstruida presenta un entrelazado coherente de ambas
+fuentes con resolución de milisegundos, condición necesaria para la detección de secuencias
+del Pilar~A.
+
+
+\subsection{Incidencia: exposición del servicio de almacenamiento}
+
+Se documenta una segunda incidencia por su carácter no evidente. El servicio de
+almacenamiento, ejecutado en contenedor con el puerto correspondiente publicado, rechazaba
+las conexiones procedentes del anfitrión pese a responder correctamente a las peticiones
+originadas dentro del propio contenedor. El síntoma resultaba engañoso, ya que el error
+devuelto sugería un problema de red o de redirección de puertos.
+
+El diagnóstico se alcanzó comprobando que el servicio tampoco respondía a peticiones dirigidas
+a su propia dirección de red: escuchaba exclusivamente en la interfaz de bucle local interna.
+La solución consistió en declarar explícitamente la interfaz de escucha en la configuración
+del servidor.
+
+
+\subsection{Incidencia: bloqueo del avance temporal por particiones inactivas}
+\label{sec:incidencia_watermark}
+
+La causa resultó ser una consecuencia no evidente de la decisión de particionado adoptada. Al
+emplear el nombre de host como clave y contener el conjunto de datos un único host, la
+totalidad de los eventos se concentra en una sola partición, quedando las restantes vacías.
+
+El motor de procesamiento calcula la marca de agua global como el mínimo de las marcas de agua
+de todas sus fuentes. Las particiones que no reciben datos nunca emiten marca de agua alguna,
+por lo que el mínimo permanece indefinido y \textbf{el tiempo de evento no avanza jamás}. La
+consecuencia es que ninguna ventana temporal llega a considerarse cerrada y el motor no emite
+resultado alguno, sin producir error que lo delate.
+
+El diagnóstico se alcanzó por descarte, reduciendo el patrón a un único evento —que debería
+haber emitido una coincidencia por cada evento de entrada— y comprobando que tampoco producía
+salida, lo que descartaba un problema en la expresión del patrón y señalaba al mecanismo
+temporal. La solución consiste en configurar un tiempo de inactividad tras el cual una fuente
+sin datos se marca como inactiva y deja de bloquear el cálculo.
+
+Resuelta la incidencia, el patrón de dos eventos emitió correctamente las coincidencias
+esperadas, encadenadas y con las marcas temporales originales de la captura. Con ello quedó
+validada la vía tecnológica y descartada la necesidad de recurrir a la alternativa prevista
+como plan de contingencia.
+
+Esta incidencia ilustra una interacción no trivial entre dos decisiones de diseño
+independientes: el particionado por host, adoptado para garantizar el orden de eventos, tiene
+como efecto colateral la inutilización del mecanismo de avance temporal cuando el número de
+hosts es inferior al de particiones.
+
+\subsection{Incidencia: la hora de los eventos era la de recogida}
+
+El primer día de APT29 no incluye el campo de hora de creación del evento, y la
+normalización recurría a la marca del colector, que corresponde al instante de
+\textbf{recepción}. El desfase medido sobre los eventos que sí traen la hora real tiene una
+mediana de 6,2\,s, un percentil 95 de 74,9\,s y un máximo de 101,2\,s. Lo grave es su
+dispersión, de 26,7\,s: los eventos se reordenaban entre sí y no había desplazamiento
+constante que corregir.
+
+La corrección establece una cadena de prioridad entre las fuentes de tiempo disponibles, con
+la conversión de zona horaria derivada por conjunto de datos, y marca cada evento con la
+fuente empleada. Ninguna fuente es fiable en todos los conjuntos: la hora UTC de Sysmon, la
+más precisa en APT29, va desviada 19 horas en las capturas de robo de credenciales. Con la
+hora corregida desapareció una inversión imposible documentada hasta entonces, en la que el
+proceso remoto aparecía tres segundos antes que la conexión que lo provoca: la conexión va
+ahora 116\,ms antes. Queda una limitación del dato de origen: el 26,6\,\% de los eventos de
+APT29 solo tiene resolución de segundo.
+
+
+\subsection{Incidencia: la identidad de los eventos y de las alertas}
+
+Durante esta fase se comprobó que el 15\,\% de los eventos normalizados de APT29 era idéntico
+byte a byte a otro, porque el evento OCSF no conservaba el número de registro de origen. Dos
+ocurrencias distintas con los mismos campos se volvían indistinguibles, y las alertas
+duplicadas por un reprocesado no se podían separar de las legítimas. Se resolvió dando
+\textbf{identidad determinista} a ambos: el evento conserva su número de registro (o, si la
+fuente no lo aporta, el ordinal de la línea en el fichero), la alerta se identifica por el
+resumen del evento y la regla, y las tablas del almacén deduplican por esa identidad. La
+comprobación final fue recuperar exactamente las 741 alertas documentadas para APT29 y las
+cifras de eventos de cada conjunto de datos contadas contra su fichero de origen.
+
+\subsection{Aristas de red del patrón P2}
+
+La construcción de las aristas destapó varios problemas que no producían error alguno.
+Bajo la misma clase OCSF de actividad de red conviven las conexiones lógicas de Sysmon y
+cada flujo permitido por el cortafuegos de Windows; filtrar por clase daba 3.480 conexiones
+WinRM donde el fichero de origen tiene 12. El mapa de direcciones IP a equipos, si cuenta
+también los registros entrantes, se corrompe en silencio: un equipo llegó a ganar su propia
+dirección por un solo voto. Se resolvió contando solo conexiones salientes, en las que la
+dirección de origen es por definición la propia. Y la dirección de bucle local escrita sin
+abreviar fabricaba aristas falsas hasta que se normalizó su grafía.
+
+\subsection{Desorden de llegada en modo continuo}
+
+La validación anterior se realizó con fuentes acotadas. En modo continuo, la marca de agua
+descarta sin aviso los eventos que llegan con más retraso del admitido, por lo que antes de
+lanzar los patrones se \textbf{midió el desorden} de llegada:
+
+\begin{itemize}
+    \item Dentro de un mismo conjunto de datos, las alertas llegan con hasta 293\,s de
+    retraso respecto a otras posteriores, por efecto de los detectores en paralelo. Con una
+    marca de agua de 30\,s se perderían 220 alertas (18\,\%); con 5 minutos, ninguna. La
+    cifra está inflada porque el corpus se reproduce decenas de veces más rápido que el
+    tiempo real.
+    \item Los \textit{topics} intermedios, escritos inicialmente sin ordenar, habrían
+    llegado «tarde» en un 74--78\,\%. Se decidió publicarlos en orden de tiempo de evento.
+    \item Al reproducir a la vez capturas de distintos años, el desorden entre conjuntos de
+    datos alcanza años. Es un artefacto de la reproducción que no existe en producción.
+\end{itemize}

@@ -1,0 +1,174 @@
+\section{Plano de inteligencia de amenazas}
+\label{sec:cti-impl}
+
+El plano de inteligencia cumple dos funciones. La primera es dar a todo el sistema una
+\textbf{referencia común}: las reglas, los patrones del Pilar~A, el grafo del Pilar~B y la
+extracción de técnicas hablan en identificadores de ATT\&CK, y esos identificadores tienen que
+significar lo mismo en todas partes. La segunda es convertir en datos estructurados la
+inteligencia que se publica como texto, mediante la extracción automática de técnicas (ML-2).
+
+\subsection{ATT\&CK como referencia común}
+
+Se fija \textbf{ATT\&CK Enterprise v19.2} \cite{mitre_attack}, con su suma SHA-256 registrada. La
+versión importa: la v19 dividió la táctica de evasión de defensas en dos y revocó técnicas, de
+modo que un mismo identificador puede no significar lo mismo en dos versiones. La v20, publicada
+durante el desarrollo y parcheada el mismo día, se descartó; subir de versión es un paso aparte
+que se medirá.
+
+La carga en el grafo usa un \textbf{cargador STIX propio e idempotente}: la identidad de cada nodo
+es su identificador STIX, cada nodo y relación guarda la lista de cargas que lo aportaron, y las
+fases de la \textit{kill chain} de cada técnica se convierten en aristas hacia su táctica. El mismo
+cargador sirve para ATT\&CK, para un feed de indicadores y para los perfiles que genera ML-2.
+ATT\&CK queda en el grafo con 4.823 nodos y 22.352 relaciones en 4,7\,s, y recargarlo no
+duplica nada.
+
+Sobre el mismo paquete se construye un \textbf{servicio de normalización de técnicas}. Dado un
+identificador, sigue las cadenas de revocación hasta el vigente (por ejemplo,
+\texttt{T1086}~$\rightarrow$~\texttt{T1059.001}), marca los obsoletos sin sustituto y sube de
+subtécnica a técnica padre. Medido contra la v19.2, las alertas y campañas del Pilar~A están
+vigentes al 100\,\%; en la verdad conocida hay dos técnicas revocadas, ninguna de ellas usada por
+los patrones.
+
+Como \textbf{feed de indicadores} se incorpora ThreatFox \cite{threatfox}, convertido de CSV a STIX
+con identificadores deterministas: 135.737 indicadores de 508 familias de malware, cargados en
+17\,s. Cada familia se enlaza con el software de ATT\&CK por nombre o alias \textbf{solo si la
+coincidencia es única}; las ambiguas se descartan (por ejemplo, Snake también coincidía con el
+Uroburos de Turla). Así, el 25,6\,\% de los indicadores llega a técnicas de ATT\&CK a través de su
+familia. El resto pertenece a familias que no están en el catálogo de software de ATT\&CK: el
+límite es el catálogo, no el cruce.
+
+\subsection{Plataforma CTI frente a carga directa}
+
+Se comparó OpenCTI \cite{opencti}, la plataforma de referencia citada en el
+Capítulo~\ref{cap:estadoarte}, con la carga directa descrita, sobre los mismos datos y con
+criterios fijados antes de medir (Tabla~\ref{tab:opencti}).
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|r|r|}
+\hline
+\textbf{Criterio} & \textbf{Carga directa} & \textbf{OpenCTI} \\
+\hline
+Ingesta de ATT\&CK (22.600 objetos) & 4,7\,s & 32\,min \\
+Ingesta de ThreatFox (272.853 objetos) & 17\,s & 3\,h 28\,min \\
+Memoria con ATT\&CK y ThreatFox & 3,6\,GB & 13,7\,GB \\
+Disco con ATT\&CK y ThreatFox & 865\,MB & 1,9\,GB \\
+Servicios & 1 & 11 \\
+\hline
+\end{tabular}
+\caption{OpenCTI frente a la carga directa en el grafo.}
+\label{tab:opencti}
+\end{table}
+
+El coste no es lo más relevante; la \textbf{fidelidad}, sí. OpenCTI descarta las 149 técnicas
+revocadas y sus relaciones de sustitución, que son justo lo que permite traducir identificadores
+antiguos. Además fusiona grupos y malware que comparten un alias (por ejemplo, Ember Bear con Saint
+Bear) y no importa las estrategias de detección ni las analíticas de ATT\&CK v18 en adelante.
+Conserva intactas las relaciones de uso, mitigación y atribución. Por eso \textbf{la referencia
+del sistema es la carga directa}, y OpenCTI queda como capa opcional para el analista y para la
+gestión de indicadores, cuyo valor añadido se mide aparte.
+
+\subsection{Extracción de técnicas de informes (ML-2)}
+\label{sec:ml2}
+
+\medskip\noindent\textbf{Tarea y datos.} Se usa AnnoCTR \cite{annoctr}, con 120 informes de CTI anotados por
+expertos. Cada mención de una técnica está enlazada con ATT\&CK, y dos tercios de las menciones son
+\textbf{implícitas}: describen la técnica sin nombrarla. La tarea se plantea como clasificación
+multietiqueta \textbf{frase~$\rightarrow$~técnicas padre}, con las particiones publicadas, que
+separan por informe (70, 16 y 34 informes para entrenamiento, desarrollo y prueba). El espacio
+de etiquetas lo forman las 59 técnicas con al menos cinco frases de entrenamiento, que cubren el
+85\,\% de las menciones de prueba. Las frases sin técnica se mantienen como ejemplos negativos.
+Se evalúa a tres niveles: por frase, por mención (explícita o implícita) y por informe, que es
+el nivel del perfil que se carga en el grafo.
+
+\medskip\noindent\textbf{Sistemas.}
+\begin{itemize}
+    \item \textbf{Línea base de diccionario:} empareja los nombres e identificadores de ATT\&CK. Los
+    nueve términos genéricos que más fallan (como «Malware» o «DNS») se podan usando solo la
+    partición de desarrollo.
+    \item \textbf{SecureBERT~2.0} \cite{securebert2}, preentrenado en textos de ciberseguridad, frente
+    a \textbf{ModernBERT-base} \cite{modernbert}, el modelo general del que parte. Como comparten
+    arquitectura, la diferencia entre ambos aísla el efecto del preentrenamiento en el dominio. El
+    SecureBERT original solo publica sus pesos en un formato que puede ejecutar código al
+    cargarse, por lo que se descartó. Solo se cargan pesos en \texttt{safetensors} y con revisión
+    fijada.
+\end{itemize}
+
+\medskip\noindent\textbf{Protocolo.} La época y el umbral de decisión se eligen en desarrollo, y la partición
+de prueba se evalúa una sola vez. Cada modelo se entrena con tres semillas, cada entrenamiento
+tarda unos cinco minutos en la GPU de la estación y todo queda registrado en MLflow. Las
+diferencias entre sistemas se contrastan con un \textbf{remuestreo emparejado por informe}
+\cite{efron1993,bergkirkpatrick2012}, con 10.000 muestras. Se remuestrea por informe porque las
+frases de un mismo informe no son independientes.
+
+\medskip\noindent\textbf{Resultados.} La Tabla~\ref{tab:ml2} resume la partición de prueba. Ambos modelos superan
+con claridad al diccionario, y SecureBERT~2.0 supera a ModernBERT de forma significativa:
++0,034 de F1 por frase, con un intervalo de confianza del 95\,\% de [+0,011, +0,058]. El
+preentrenamiento en el dominio aporta. La ventaja se concentra en las menciones explícitas; en
+las implícitas, los dos modelos casi empatan.
+
+\begin{table}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{|l|c|c|c|c|c|}
+\hline
+\textbf{Sistema (prueba)} & \textbf{F1 frase} & \textbf{F1 macro} & \textbf{R explícitas} & \textbf{R implícitas} & \textbf{F1 informe} \\
+\hline
+Diccionario & 0,330 & 0,349 & 0,355 & 0,151 & 0,490 \\
+ModernBERT-base & 0,519 & 0,262 & 0,670 & 0,411 & 0,620 \\
+SecureBERT 2.0 & 0,553 & 0,301 & 0,721 & 0,424 & 0,670 \\
+\textbf{SecureBERT 2.0 $\cup$ diccionario} & \textbf{0,590} & \textbf{0,464} & \textbf{0,832} & \textbf{0,488} & \textbf{0,713} \\
+\hline
+\end{tabular}%
+}
+\caption{ML-2 en la partición de prueba de AnnoCTR (media de tres semillas; R: exhaustividad
+por mención).}
+\label{tab:ml2}
+\end{table}
+
+El análisis por técnica explica por qué conviene combinar modelo y diccionario. El F1 de cada
+técnica crece con su frecuencia en entrenamiento (correlación de Spearman de 0,61): el modelo gana
+en las técnicas con veinte o más frases de entrenamiento, y el diccionario en las raras cuando
+aparecen nombradas. Elegida en desarrollo, sin embargo, la unión de los dos perdía 0,011. La causa
+es que la partición de desarrollo apenas nombra técnicas: el diccionario rinde allí la tercera
+parte que en prueba. Con solo 16 informes no daba para decidir, y \textbf{la decisión se tomó con
+una validación cruzada por informe sobre los 86 de entrenamiento y desarrollo}, con reglas fijadas
+antes de ejecutarla. La unión mejora en +0,040 de F1 por frase, con un intervalo de [+0,020,
++0,060], y gana en cuatro de los cinco bloques. Es el sistema adoptado. La lección vale para
+cualquier conjunto pequeño: con 16 informes se habría concluido justo lo contrario.
+
+La precisión medida está además \textbf{infraestimada}. En una revisión manual de 60 de los 270
+falsos positivos (Anexo~\ref{anx:ml2}), el 42\,\% resultaron técnicas que la frase sí describe y
+que AnnoCTR no anotó, como filas de tablas de ATT\&CK u órdenes de PowerShell literales. Contándolas
+como aciertos, la precisión por frase pasaría de 0,61 a unos 0,77. Los errores reales se deben a
+técnicas vecinas de una misma cadena (intérprete de órdenes frente a \textit{phishing}, ofuscación
+frente a canal cifrado) y a tomar por comportamiento del adversario la discusión general de una
+tecnología.
+
+\medskip\noindent\textbf{Evaluación sobre el corpus del proyecto.} El sistema se aplicó a seis informes públicos
+de Microsoft sobre APT29, de los que se descartan las secciones de defensa y de producto. El perfil
+resultante se compara con la ficha de ATT\&CK del grupo y con lo que detectó el propio sistema.
+
+\begin{itemize}
+    \item \textbf{Frente a la ficha de ATT\&CK} (G0016 y sus dos campañas): de sus 72 técnicas,
+    solo 33 están en el espacio de etiquetas. Frente a esas 33, el perfil alcanza un F1 de 0,69,
+    con precisión 0,83 y exhaustividad 0,60. El diccionario solo llega a 0,49 y el modelo solo a
+    0,53.
+    \item \textbf{Frente a lo detectado en el primer día de APT29}: dentro del espacio de etiquetas,
+    el perfil extraído cubre 4 de las 5 técnicas de las campañas detectadas, igual que la ficha
+    oficial del grupo. La laguna más relevante es estructural: \textbf{el volcado de credenciales
+    (\texttt{T1003}), núcleo del patrón P1, no está entre las 59 etiquetas}, porque el espacio sale
+    de la frecuencia en AnnoCTR y no de lo que detecta el sistema.
+    \item \textbf{Parecido entre campaña y actor}: se ordenaron los 173 grupos de ATT\&CK por parecido
+    de técnicas con las campañas detectadas. G0016 no aparece arriba con ninguna de las medidas
+    fijadas: queda entre el puesto 39 y el 85, y ni siquiera con la verdad del plan de emulación
+    como consulta pasa del 57. Las campañas tienen pocas técnicas, genéricas y compartidas por
+    muchos grupos. Es un resultado negativo que se informa como tal: \textbf{comparar conjuntos de
+    técnicas no basta para reconocer a un actor}.
+\end{itemize}
+
+Este último bloque tiene una circularidad que se declara: la ficha de G0016 se construye en parte
+con estos mismos informes, y AnnoCTR incluye informes de APT29, de otros editores, en
+entrenamiento. Coincidir con la ficha es esperable y no prueba que el modelo generalice; eso lo
+prueba la evaluación sobre AnnoCTR. El perfil se exporta en STIX~2.1, con la confianza, la
+evidencia y el método de cada técnica, y se carga en el grafo con el mismo cargador que ATT\&CK.

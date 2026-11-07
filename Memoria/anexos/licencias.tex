@@ -11,7 +11,10 @@
 \multicolumn{3}{|l|}{\textit{Datos y bases de conocimiento}} \\
 \hline
 OTRF Security-Datasets (incluida APT29) & MIT & Corpus de evaluación \\
-MITRE ATT\&CK & Términos de uso de MITRE & Catálogo de técnicas \\
+MITRE ATT\&CK v19.2 & Términos de uso de MITRE & Catálogo de técnicas y referencia común \\
+ThreatFox (abuse.ch) & Uso gratuito (\textit{fair use}) & Feed de indicadores \\
+AnnoCTR & CC BY-SA 4.0 & Entrenamiento y evaluación de ML-2 \\
+Informes de Microsoft Security Blog & Derechos de Microsoft (copia local) & Evaluación de ML-2 sobre APT29 \\
 Reglas Sigma (SigmaHQ) & Detection Rule License 1.1 & Reglas de detección \\
 Esquema OCSF & Apache 2.0 & Esquema canónico \\
 \hline
@@ -30,15 +33,16 @@ Sysmon & Sysinternals (gratuita) & Telemetría de Windows \\
 Atomic Red Team & MIT & Laboratorio de emulación \\
 VirtualBox & GPL 3.0 & Laboratorio de emulación \\
 React & MIT & Portal web \\
+Neo4j Community, GDS y APOC & GPL 3.0 (APOC: Apache 2.0) & Grafo de conocimiento y de ataque \\
+OpenCTI & Apache 2.0 & Comparativa de plataformas CTI \\
+PyTorch & BSD de 3 cláusulas & Afinado de modelos \\
+Transformers (Hugging Face) & Apache 2.0 & Afinado de modelos \\
+SecureBERT 2.0 y ModernBERT-base & Apache 2.0 & Extracción de técnicas (ML-2) \\
 \hline
 \multicolumn{3}{|l|}{\textit{Componentes previstos}} \\
 \hline
-OpenCTI & Apache 2.0 & Plataforma de inteligencia \\
-SecureBERT & BigScience OpenRAIL-M & Extracción de técnicas \\
 Dagster & Apache 2.0 & Orquestación \\
-Neo4j Community y GDS & GPL 3.0 & Grafo de ataque \\
 Soufflé & UPL 1.0 & Razonamiento Datalog \\
-PyTorch & BSD de 3 cláusulas & Aprendizaje sobre grafos \\
 FastAPI & MIT & API \\
 SHAP & MIT & Explicación de la puntuación \\
 MinIO & AGPL 3.0 & Almacén de modelos \\
@@ -50,6 +54,7 @@ CALDERA & Apache 2.0 & Simulación de campañas \\
 \label{tab:licencias}
 \end{table}
 
-Ninguna de estas licencias impone coste ni impide el uso académico. Las licencias de tipo
+Ninguna de estas licencias impone coste ni impide el uso académico. Los informes de Microsoft
+no se redistribuyen: solo se usan copias locales y se citan fragmentos breves. Las licencias de tipo
 \textit{copyleft} (GPL y AGPL) solo obligarían a publicar el código fuente si se
 distribuyera una versión modificada del componente, lo que no ocurre en este trabajo.
