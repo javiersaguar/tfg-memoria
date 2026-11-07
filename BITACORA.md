@@ -1686,3 +1686,30 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - `docs/encargos/notas-datasets-fa.md`;
   - main: `docs/ROADMAP.md`;
   - fuera de git: `data/fa/`, `data/samples/apt29/day2/` y `data/ml2/detecciones/`.
+
+### 2026-11-07 (10) — Stack completo y cuadros de Grafana al día
+- **Con qué/quién:** Javier (pidió levantar el stack y actualizar Grafana); Claude Code (generador, cuadros, comprobaciones y esta entrada).
+- **Stack:** `./scripts/up.sh all` (Prometheus y Grafana; el resto ya estaba). OpenCTI está parado.
+- **Cuadros:**
+  - generados con `infra/grafana/generar_dashboards.py`, en vez de JSON escrito a mano;
+  - todos usan FINAL y dos filtros comunes: origen (corpus, atómico, fa, fa_red, fa_benigno) y dataset.
+  - **2 · Seguridad:** rehecho; ahora con alertas, técnicas, reglas más ruidosas y campañas.
+  - **3 · Calidad:** la cobertura deja de estar escrita a mano y se mide en el bus (normalizados frente a DLQ, por topic): **98,39 % global**. Incluye la tabla de datasets con verdad, alertas y campañas.
+  - **5 · Campañas (nuevo):** reducción, precisión automática antes de la revisión, esperado frente a detectado por dataset y detalle.
+  - **6 · Validación externa (nuevo):** volumen por origen, falsas alarmas de COMISET por host-hora, red de Zeek y campañas de day2.
+  - **1 · Salud:** se añaden la cobertura global y los mensajes en DLQ.
+  - Las 34 consultas se probaron contra ClickHouse y las capturas con Playwright no muestran paneles con error.
+- **Cifras globales (todos los orígenes):** 1,22 M de eventos, 3.033 alertas y 60 campañas (P1 35, P2 8, P3 17). Precisión automática de 0,63 antes de la revisión manual.
+- **Conclusiones de FA:**
+  1. **Los patrones generalizan dentro del mismo entorno:** day2, sin reajustar nada, da los tres patrones esperados con precisión 4/5 (IC 95 % 0,38–0,96). No es una validación independiente: es la misma infraestructura y la misma emulación.
+  2. **El único falso positivo es sistemático** (`wininit`/`csrss` → LSASS, igual que en F3): una exclusión lo corregiría en los dos.
+  3. **La exclusión del controlador de dominio en P2 tiene un coste medido:** se pierde el salto a NEWYORK, que en un ataque real es el objetivo más valioso.
+  4. **La capa OCSF generaliza:** 99,7 % en day2 sin mapeadores nuevos, y COMISET entra con un adaptador de entrada.
+  5. **La correlación host–red no se puede validar con datos públicos de OTRF:** Zeek es otra ejecución. Hacen falta capturas sincronizadas.
+  6. **Sobre actividad normal, las reglas disparan (≈29 alertas por host-hora en el piloto) y las campañas no (0).** Apoya la tesis del Pilar A, pero la muestra son 6 minutos de un host.
+- **Mejoras propuestas, por orden:**
+  - ajuste v2 medido aparte: exclusión en P1, controlador de dominio en P2 con más evidencia y menos confianza, y evaluador de palabras clave;
+  - COMISET v2 y LAB;
+  - reglas Sigma de red;
+  - un conjunto con host y red sincronizados (AIT LDS v2 o CAM-LDS) o una captura propia;
+  - T1003, T1548 y T1569 en el espacio de etiquetas de ML-2.
