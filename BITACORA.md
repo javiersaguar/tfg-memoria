@@ -1664,3 +1664,25 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Título elegido:** «Diseño y desarrollo de una plataforma de conciencia cibersituacional para la detección de ataques multi-etapa y priorización de incidentes».
   - Puesto en la portada, la portada naranja, la página de autor y el README.
   - Los documentos de reuniones anteriores conservan el título que tenían.
+
+### 2026-11-07 (9) — FA: day2, Zeek y COMISET recorren F1–F3 (el agente de FA se quedó sin uso)
+- **Con qué/quién:**
+  - el agente de FA, en el worktree `fa-datasets`: adaptadores, cargas y comprobaciones; se quedó sin uso a mitad del cierre;
+  - Claude Code, como coordinador: verificó todo en ClickHouse y Redpanda, revisó las campañas, cerró el cuaderno, rehízo 6b de ML-2 con day2 y escribió esta entrada;
+  - Javier autorizó los comandos de servicios para completar F1–F3 con los tres conjuntos.
+- **Resultado:** los tres conjuntos están en el corpus con sus propios topics y grupos. **F3 no cambia** en ninguna de las tres cargas.
+  - **Day2:** 585.479 eventos, 290 alertas y 5 campañas. Hay 4 verdaderas y 1 falsa (P1 por `wininit`/`csrss`), así que la precisión es 0,80. El salto al controlador de dominio no se ve por diseño.
+  - **Zeek:** 2.088 eventos normalizados. **No confirma ninguna arista de P2: es otra ejecución de la emulación** (25–51 h antes y sin ningún puerto en común).
+  - **COMISET v1:** 99.749 eventos; 3 alertas candidatas a falsa alarma y 0 campañas en solo 6 minutos de un host. Hace falta la v2.
+  - **ML-2, 6b con day2:** el perfil cubre las 2/2 técnicas de campaña en el espacio, igual que la ficha G0016.
+- **Hallazgos para el ajuste v2 de F3:** el filtro de `wininit`/`csrss` en P1 (se repite en day2) y una limitación del evaluador Sigma con las búsquedas de palabra clave en un campo, registrada como test de fallo esperado.
+- **Incidencia:** el cierre del job de normalización falló con particiones vacías (`_NO_OFFSET`) después de publicar todo. Se corrigió solo para FA.
+- **Pendiente de Javier:**
+  - revisar la verdad de day2 (parcial, 40 técnicas);
+  - hacer commit de la rama `fa-datasets` y fusionarla;
+  - decidir la v2 de COMISET.
+- **Archivos tocados:**
+  - rama `fa-datasets`: código nuevo en `pipeline/normalize/` (zeek, comiset, fa_*), `detection/evaluation/fa_*`, `scripts/load_fa_corpus.sh` y filas nuevas en `verdad_datasets.csv`;
+  - `docs/encargos/notas-datasets-fa.md`;
+  - main: `docs/ROADMAP.md`;
+  - fuera de git: `data/fa/`, `data/samples/apt29/day2/` y `data/ml2/detecciones/`.
