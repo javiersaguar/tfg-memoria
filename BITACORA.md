@@ -1592,3 +1592,38 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - `tfg-ciberconciencia/`: `cti/extract/{validacion_cruzada.py,informes.py,perfil_apt29.py}`, `docs/ROADMAP.md`;
   - `data/ml2/{cv,resultados/perfil-apt29.json}`, fuera de git;
   - esta entrada.
+
+### 2026-11-07 (5) — ML-2: perfil en STIX, revisión de falsos positivos y preparación de 6b/6c
+- **Con qué/quién:** Javier (pidió 6b, 6c, el paso 5 y la revisión de falsos positivos); Claude Code (scripts, revisión y esta entrada).
+- **Paso 5:**
+  - `cti/extract/perfil_stix.py` genera `data/ml2/stix/apt29-perfil.json`: 6 informes y 22 relaciones G0016 –uses→ técnica, con confianza, frases, informes, método y evidencia.
+  - El cargador STIX convierte los `object_refs` de los informes en aristas `REFERS_TO` (10 tests en verde).
+  - Falta cargarlo en Neo4j, lo hace Javier.
+- **Paso 7, revisión de falsos positivos** (`cti/extract/revision_fp.md`): muestra fija de 60 de 270. Resultado: 25 huecos de anotación, 10 dudosos y 25 errores. La precisión por frase pasaría de 0,61 a ~0,77 (0,73–0,82). La clasificación es de Claude Code y **Javier tiene que validarla**.
+- **6b/6c:**
+  - `cti/extract/export_detecciones.sql` (solo lectura, la lanza Javier) y `cti/extract/detectado.py`, listos.
+  - **Prueba previa con la verdad del plan de day1:** con Jaccard y coseno IDF, G0016 queda en el puesto 57–67 de 174.
+    - La ficha actual de G0016 solo contiene 20 de las 33 técnicas del plan.
+    - Las técnicas que comparten son genéricas.
+    - Con la medida de cobertura, añadida como diagnóstico tras verlo, queda el 14.º.
+  - **Comparar solo conjuntos de técnicas no identifica al actor.** Se informará así.
+- **Archivos tocados:**
+  - `tfg-ciberconciencia/`: `cti/extract/{perfil_stix.py,revision_fp.md,export_detecciones.sql,detectado.py}`, `cti/stix_loader/{transform.py,test_transform.py}`, `docs/ROADMAP.md`;
+  - `data/ml2/{stix,revision}/`, fuera de git;
+  - esta entrada.
+
+### 2026-11-07 (6) — ML-2: 6b y 6c sobre day1; README al día
+- **Con qué/quién:** Javier (exportó lo detectado de ClickHouse y levantó Neo4j); Claude Code (análisis, README y esta entrada).
+- **6b.**
+  - Day1 tiene 24 técnicas padre en alertas y 8 en campañas.
+  - Dentro de las 59 etiquetas, **el perfil extraído de los 6 informes cubre 4 de las 5 técnicas de campaña, igual que la ficha G0016.** De las alertas cubre 8/16 (la ficha, 12/16); de la verdad del plan, 10/23 (14/23).
+  - **T1003, núcleo de P1, no está en el espacio de etiquetas** (tampoco T1548 ni T1569).
+- **6c.**
+  - Entre 174 candidatos, G0016 queda entre el puesto 39 y el 85 con Jaccard y coseno IDF, también con la verdad del plan como consulta.
+  - Las campañas tienen pocas técnicas y genéricas. **Comparar conjuntos de técnicas no identifica al actor:** resultado negativo que se informa como tal.
+- **Neo4j:** la primera carga del perfil falló porque Neo4j aún arrancaba; hay que repetirla. Desactivada su telemetría en el compose (`NEO4J_dbms_usage__report_enabled=false`); se aplica al recrear el contenedor.
+- **README:** estado por fase (F2 y F3 cerradas, F4 en curso, F8 con base adelantada, FA condicionada), hitos de F2–F4, stack de ML, perfiles `graph`/`cti`/`mlops` y licencias de las fuentes de CTI y ML-2.
+- **Archivos tocados:**
+  - `tfg-ciberconciencia/`: `README.md`, `docs/ROADMAP.md`, `infra/docker-compose.yml`, `cti/extract/detectado.py`;
+  - `data/ml2/{detecciones,resultados/detectado.json}`, fuera de git;
+  - esta entrada.
