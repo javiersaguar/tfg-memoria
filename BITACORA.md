@@ -1780,3 +1780,35 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - `emulation/{label_dataset.py,export-events-clean.ps1}`;
   - `docs/ROADMAP.md` (F2.3, F3.5, FA.0, FA.3 y FA.3b);
   - fuera de git, `data/fa/*lab*`, `data/fa/v2-flink/` y `data/emulation-lab/origen-vboxshared/`.
+
+### 2026-11-08 (2) — F4 cumplida en el código: OpenCTI decidido, ML-2 aumentado adoptado y 15 informes en el grafo
+- **Con qué/quién:** Javier (levantó el perfil `cti` y guardó lo anterior); Claude Code (mediciones, scripts, decisiones con reglas fijadas antes de medir y esta entrada).
+- **F4.2, OpenCTI frente al plan B. Decidido: el plan B es la capa CTI; OpenCTI queda como perfil opcional, fuera del camino de los datos.**
+  - **Recuento de ThreatFox en OpenCTI:**
+    - 134.849 indicadores de 135.737: deduplica por patrón (888 repetidos);
+    - fusiona 96 familias de malware por nombre o alias;
+    - revoca por caducidad: ya hay 4.701 indicadores revocados (47 días de vida para IP y URL, 300 para dominios, 460 para ficheros). **Es su valor añadido real**, y se copiará en el cargador propio como `valid_until`.
+  - **Conector de documentos** (`cti/comparativa/opencti_documentos.py`, en modo `workbench`, sin escribir en la plataforma), con las 683 frases de APT29:
+    - **0 técnicas**: solo reconoce identificadores `T1xxx` explícitos (13 de 14 en un control);
+    - no vale como línea base de ML-2, porque el diccionario propio saca 12;
+    - sí reconoce entidades (APT29, SolarWinds, malware, con falsos positivos), útil para el paso 9 (NER).
+- **ML-2 aumentado** (`cti/extract/validacion_cruzada_aug.py`), con la regla de no inferioridad fijada antes de entrenar (margen −0,02, IC 95 %):
+  - unión aumentada frente a la adoptada: −0,002 por frase, IC 95 % [−0,018, +0,013];
+  - el brazo A reproduce exactamente la validación del 07-11;
+  - **se adopta el aumentado**: no empeora las 59 técnicas y añade T1003, T1548 y T1569.
+- **Perfil STIX de APT29 regenerado** y sustituido en Neo4j: 22 técnicas; entra T1548 y sale T1055; F1 frente a G0016 más campañas de 0,667 (antes 0,655). El anterior está en `apt29-perfil-v1.json`.
+- **DoD 5 de F4 (≥ 10 informes):** `cti/extract/perfiles_informes.py` procesa los otros 9 informes de Microsoft. El actor se resuelve por alias exacto en ATT&CK (7 grupos; Storm-0558 y el informe multiactor quedan solo como `report`).
+  - En el grafo hay **15 informes y perfiles de 8 actores**.
+  - **Generalización a actores nuevos:** precisión media de 0,73 por actor con un solo informe. La exhaustividad es baja (0,11–0,50) porque la ficha de ATT&CK acumula muchas fuentes.
+- **Grafana:** el cuadro 6 tiene una sección nueva con las campañas de v1 frente a v2 por origen y una tabla de LAB y del laboratorio propio.
+- **Pendiente:**
+  - memoria LaTeX (FA, v2, LAB, fa_vm, OpenCTI, ML-2 aumentado y perfiles), con el cuerpo en ≤ 60 páginas;
+  - de Javier: los 10 «dudosos» de `revision_fp.md`;
+  - `valid_until` en el cargador cuando F5/F6 usen IOCs;
+  - después, F5.
+- **Archivos tocados:**
+  - `cti/comparativa/opencti_documentos.py`, `cti/extract/{validacion_cruzada_aug.py,perfiles_informes.py}` (nuevos);
+  - `cti/extract/{perfil_apt29.py,perfil_stix.py}`;
+  - `infra/grafana/generar_dashboards.py` y el JSON del cuadro 6;
+  - `docs/ROADMAP.md` (rev. 6);
+  - fuera de git: `data/ml2/{cv_aug,stix,resultados}/` y `data/cti/opencti/documentos/`.
