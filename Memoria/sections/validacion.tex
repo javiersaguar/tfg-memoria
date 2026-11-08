@@ -1,0 +1,96 @@
+\section{Ampliación del corpus y validación externa}
+\label{sec:validacion-externa}
+
+Las cifras de la Sección~\ref{sec:pilarA-evaluacion} tienen dos límites: los patrones se diseñaron
+mirando el mismo corpus con que se evalúan, y ese corpus no contiene actividad legítima de fondo.
+Esta sección los aborda con conjuntos que no intervinieron en el diseño. Cada uno se carga con sus
+propios \textit{topics} y grupos de consumo, y se comprueba que los resultados de los 110 conjuntos
+del Pilar~A no cambian (Anexo~\ref{anx:validacion}). \textbf{Las cifras oficiales de la fase no se
+tocan}.
+
+\subsection{Segunda versión de los patrones}
+\label{sec:pilarA-v2}
+
+La segunda versión (v2) corrige tres causas de error encontradas en la revisión:
+\begin{itemize}
+    \item P1 descarta las alertas de credenciales cuyo origen es el ruido de arranque
+    (\texttt{csrss.exe} y \texttt{wininit.exe});
+    \item P2 solo acepta el controlador de dominio como destino si hay ejecución remota desde una
+    herramienta de movimiento lateral;
+    \item el evaluador Sigma interpreta las palabras clave como subcadenas, como prevé Sigma, lo
+    que recupera 1.692 alertas de dos reglas.
+\end{itemize}
+Sobre las capturas atómicas, la precisión de P1 pasa de 0,43 a 0,56 y su exhaustividad de 0,47 a
+0,74, en evaluación automática. Recupera Mimikatz ejecutado en memoria y quita tres campañas
+falsas. Como el ajuste se hizo mirando esos datos, se portó a Flink como versión paralela, con
+salida propia, y \textbf{solo se adopta tras validarla en conjuntos que ningún ajuste ha visto}.
+
+\subsection{Conjuntos y resultados}
+
+\begin{table}[H]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{|p{2.6cm}|p{3.4cm}|r|r|r|p{3.3cm}|}
+\hline
+\textbf{Conjunto} & \textbf{Qué aporta} & \textbf{Eventos} & \textbf{Alertas} & \textbf{Camp.} & \textbf{Lectura} \\
+\hline
+APT29, segundo día \cite{otrf} & Otra jornada de ataque sobre la misma red & 585.479 & 290 & 5 / 6 & v1: 4 de 5 verdaderas; v2: todas verdaderas \\
+Zeek de APT29 \cite{otrf} & Primera fuente de red & 2.088 & 0 & 0 & Es de otra ejecución: solo topología \\
+COMISET, red real \cite{comiset} & Actividad normal de 15 equipos (50,6\,h) & 1,67\,M & 48 & 0 & 0,95 alertas y 0 campañas por equipo y hora \\
+COMISET, equipo con pruebas & Atomic Red Team \cite{atomicredteam} sin etiquetar & --- & 1.183 & 4 & Ataque simulado reconocido \\
+COMISET, laboratorio \cite{comiset} & Un equipo con ataques etiquetados por reglas & 600.218 & 85 & 0 & v1 = v2; etiquetas ruidosas \\
+Laboratorio propio & Verdad por ventanas temporales & 14.945 & 886 & 1 & P1 correcto; 0 en la línea base \\
+\hline
+\end{tabular}
+\caption{Conjuntos de la validación externa. En el segundo día de APT29 se indican las campañas de
+v1 y de v2; en los demás, las dos versiones coinciden.}
+\label{tab:validacion-externa}
+\end{table}
+
+\medskip\noindent\textbf{APT29, segundo día y Zeek.} En el segundo día, v1 da dos campañas verdaderas de P1
+con Mimikatz, una de P2 y una de P3, y una falsa de P1 con el ruido de \texttt{wininit.exe}. En v2,
+la falsa desaparece, aparece la falsificación de un \textit{Golden Ticket} y P2 recupera el salto al
+controlador de dominio: \textbf{todas sus campañas son verdaderas}. Zeek aporta la primera fuente de
+red, con su mapeador a OCSF, pero no confirma ninguna arista de P2: sus registros son 25 y 51 horas
+anteriores a los de los equipos, de otra ejecución de la emulación. Sirven para la topología, no para
+correlacionar.
+
+\medskip\noindent\textbf{Falsas alarmas sobre actividad normal.} COMISET \cite{comiset} publica 14 días de
+una red universitaria real: 16 equipos y 202 millones de registros. Tras un censo completo se
+eligieron 8 horas por equipo, antes de detectar nada. Sobre 50,6 horas observadas de 15 equipos
+salen \textbf{48 alertas, 3 de nivel alto y ninguna campaña}. Son 0,95 alertas por equipo y hora, con
+una cota superior del 95\,\% de 0,06 campañas por equipo y hora. Las alertas son mantenimiento de
+Windows. Es la tasa que las capturas atómicas no podían dar. El censo encontró además un equipo con
+Atomic Red Team ejecutando pruebas: se separó de la medida, y en él el sistema abre \textbf{cuatro
+campañas} de P1 y P3 sobre una actividad que el conjunto no etiqueta.
+
+\medskip\noindent\textbf{Laboratorio de COMISET.} Es un solo equipo con eventos etiquetados con ATT\&CK. Se
+tomaron las 12 horas con más etiquetas de las técnicas de los patrones y 6 sin ninguna como
+control. \textbf{v1 y v2 dan las mismas 85 alertas, ninguna campaña y ninguna alerta en el control.}
+Las etiquetas no son una verdad independiente: las pone un sistema de reglas, y la mayoría son
+comportamiento normal de Windows. Sí hay un ataque real: un servicio de control remoto vulnerable
+lanza una consola como SYSTEM y le siguen reconocimiento y un PowerShell interactivo como SYSTEM.
+El sistema lo alerta en el momento exacto, pero \textbf{P3 no abre campaña}, porque ninguna regla
+cubre la explotación del servicio y el patrón necesita esa etapa.
+
+\medskip\noindent\textbf{Laboratorio propio.} El conjunto de la Sección~\ref{sec:laboratorio} es \textbf{la
+única verdad independiente de cualquier regla}, porque sale de las ventanas del manifiesto. Se carga
+la telemetría completa, separada en el ataque (1\,h 12\,min) y la línea base (5\,h 49\,min). P1
+reconoce el robo de credenciales con 19 evidencias: \texttt{procdump} y \texttt{comsvcs.dll} sobre
+LSASS, la limpieza con \texttt{fsutil} y la herramienta en disco. La línea base no produce ninguna
+campaña. De las cuatro técnicas, tres tienen alertas específicas en su ventana; la inyección, que
+Defender bloqueó, no tiene ninguna.
+
+\subsection{Decisión y límites}
+
+En los dos conjuntos que ningún ajuste ha visto, \textbf{v2 produce las mismas alertas y campañas que
+v1}, alerta por alerta. En las capturas atómicas y en el segundo día de APT29, en cambio, corrige
+errores identificados. Por eso \textbf{v2 pasa a ser la versión actual} para las fases siguientes y
+el portal. Las cifras v1 se mantienen como las de referencia de la fase. Hay tres límites:
+\begin{itemize}
+    \item la actividad normal de COMISET no está etiquetada y se supone benigna;
+    \item los conjuntos externos no permiten medir la exhaustividad;
+    \item los dos falsos negativos encontrados son de cobertura de reglas, no de la lógica de los
+    patrones.
+\end{itemize}

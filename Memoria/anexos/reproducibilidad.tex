@@ -19,8 +19,8 @@ ClickHouse & 25.3 & \texttt{store} & En uso \\
 Prometheus y Grafana & 3.1.0 / 11.5.1 & \texttt{observability} & En uso \\
 MLflow & 2.19.0 & \texttt{mlops} & En uso \\
 Portal web & --- & \texttt{portal} & En uso (demostración) \\
-Neo4j con GDS & --- & \texttt{graph} & Fase 5 \\
-OpenCTI & --- & \texttt{cti} & Fase 4 \\
+Neo4j con GDS & 5.26.31 & \texttt{graph} & En uso (plano CTI) \\
+OpenCTI (Community) & 7.261023.1 & \texttt{cti} & Opcional \\
 Dagster & --- & \texttt{orchestration} & Fase 4 \\
 FastAPI & --- & \texttt{api} & Fase 6 \\
 \hline
@@ -44,9 +44,11 @@ FastAPI & --- & \texttt{api} & Fase 6 \\
 \texttt{det.p1\_flujo}, \texttt{det.p2\_flujo}, \texttt{det.p3\_flujo} & 3 & Evidencia de cada patrón, en orden de tiempo \\
 \texttt{det.campaigns} & 3 & Campañas en el esquema común \\
 \texttt{dlq.*} & 1 & Rechazos de cada etapa, con su motivo \\
+\texttt{*.fa.<id>.*} & 3 & Copia aislada de la cadena para cada conjunto externo \\
+\texttt{det.v2.<grupo>.*} & 3 & Segunda versión de los patrones \\
 \hline
 \end{tabular}
-\caption{Topics empleados en el Pilar A.}
+\caption{Topics empleados en el Pilar A y en la validación externa.}
 \end{table}
 
 La partición de \texttt{norm.events} se decide por la identidad del evento (conjunto de

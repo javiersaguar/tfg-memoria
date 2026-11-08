@@ -1,0 +1,92 @@
+\chapter{Detalle de la validación externa}
+\label{anx:validacion}
+
+\section{Carga aislada}
+
+Cada conjunto externo se carga con su identificador de ejecución, y de ahí salen sus propios
+\textit{topics} (\texttt{raw.fa.<id>.*}, \texttt{norm.fa.<id>.*} y los de detección) y sus grupos
+de consumo. Los pasos son siempre los mismos:
+\begin{enumerate}
+    \item foto del almacén antes de cargar;
+    \item reproducción y normalización, comprobando que lo crudo es igual a lo normalizado más lo
+    rechazado con motivo;
+    \item detección por tandas;
+    \item volcado a ClickHouse;
+    \item patrones en Flink con el plan sin verdad;
+    \item foto de nuevo.
+\end{enumerate}
+La carga solo se da por buena si las dos fotos de los 110 conjuntos del Pilar~A coinciden. La
+segunda versión de los patrones lee los mismos \textit{topics} normalizados y escribe en
+\texttt{det.v2.<grupo>.*} y en una tabla de campañas propia, así que v1 y v2 se comparan sobre los
+mismos eventos.
+
+\section{COMISET: censo y selección}
+
+El archivo de la red real ocupa 31,7\,GB comprimido y 934,5\,GB descomprimido. Se recorrió en
+flujo, sin descomprimirlo a disco, y el censo completo tardó 59 minutos: 202,3 millones de registros,
+16 equipos y 14 días, de los que el 99,98\,\% son de Sysmon. Antes de detectar se fijó la
+selección:
+\begin{itemize}
+    \item 8 horas por equipo, repartidas por toda su actividad;
+    \item un tope de 20.000 registros por hora.
+\end{itemize}
+Salen 110 horas y 1,75 millones de registros, y cada hora es un conjunto. El 99,91\,\% se normaliza;
+los rechazos son tipos de Sysmon sin mapeador (DNS, tuberías y otros).
+
+En el laboratorio de COMISET, el criterio también se fijó antes de detectar:
+\begin{itemize}
+    \item las horas de ataque son las de más etiquetas de las técnicas que miran los patrones;
+    \item las de control, horas sin ninguna de esas etiquetas;
+    \item cada hora de ataque se recorta a la actividad etiquetada, con 10 minutos de margen.
+\end{itemize}
+Las etiquetas resultaron ser sobre todo ruido de las reglas que las ponen: el 95\,\% de las de
+inyección son el Explorador abriendo el Administrador de tareas, las de credenciales del registro son
+escrituras de Restaurar sistema y los accesos a LSASS son de servicios del sistema con permisos
+inocuos. Elegir por número de etiquetas eligió horas ruidosas, no horas de ataque. El ataque real de
+la muestra (la explotación de un servicio de control remoto) da dos alertas de nivel alto; la
+elevación no la cubre ninguna regla, y se deja sin corregir porque el conjunto es de validación. El
+presupuesto de unos 600.000 eventos lo impuso la detección. Un solo equipo cae en una única
+partición y se detecta con un solo proceso: unos 255 eventos por segundo con v1 y unos 90 con v2.
+Hizo falta poder reanudar la detección sin duplicar.
+
+\section{Laboratorio propio}
+
+La telemetría del laboratorio no trae número de registro, y su hora está en la zona local de la
+máquina virtual. El adaptador hace dos cosas:
+\begin{itemize}
+    \item convierte la hora a UTC con la zona declarada y la comprueba contra el campo de hora UTC
+    de Sysmon, con un desfase exacto de 120 minutos en los 11.959 eventos que lo traen;
+    \item toma como identidad del evento la línea del fichero de origen.
+\end{itemize}
+Se normaliza el 99,5\,\%; solo quedan fuera las 81 consultas DNS de Sysmon. El corte entre el ataque
+y la línea base se fijó 37 minutos después de la última ventana de ataque.
+
+La máquina virtual se borró durante el desarrollo, pero los datos se conservaban. El guion de
+etiquetado se reconstruyó a partir de ellos, y reproduce fila a fila el conjunto final de 14.895
+eventos. El guion que orquestaba la captura se perdió, así que la captura no puede repetirse
+exactamente igual.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{|l|r|l|}
+\hline
+\textbf{Técnica (pruebas)} & \textbf{Alertas en ventana} & \textbf{Reglas específicas} \\
+\hline
+\texttt{T1547.001} (19) & 138 & Carpeta de inicio, claves de ejecución automática \\
+\texttt{T1070} (2) & 12 & \texttt{fsutil} \\
+\texttt{T1055} (3) & 15 & Ninguna (solo el andamiaje del marco de pruebas) \\
+\texttt{T1003.001} (5) & 40 & \texttt{procdump} sobre LSASS, \texttt{comsvcs.dll} \\
+\hline
+\end{tabular}
+\caption{Alertas dentro de las ventanas del manifiesto. Parte de ellas son el reconocimiento con
+\texttt{whoami} y \texttt{hostname} que lanza el propio marco de pruebas.}
+\end{table}
+
+La campaña de P1 empieza 13 minutos antes del volcado. La primera evidencia es una copia de
+seguridad del registro hecha por una prueba de persistencia, que una regla de volcado de colmenas
+del registro confunde con un volcado. Es imprecisión de la regla, no del patrón. En la línea base,
+518 de las 553 alertas son reconocimiento de bajo nivel (\texttt{whoami} y \texttt{systeminfo}) que
+lanza el generador de actividad simulada, y ninguna abre campaña. La línea base incluye además un
+reinicio de la máquina en el que se ejecuta la persistencia que dejó el ataque: sus seis alertas de
+nivel alto son verdaderos positivos, no falsas alarmas.

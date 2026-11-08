@@ -1812,3 +1812,26 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - `infra/grafana/generar_dashboards.py` y el JSON del cuadro 6;
   - `docs/ROADMAP.md` (rev. 6);
   - fuera de git: `data/ml2/{cv_aug,stix,resultados}/` y `data/cti/opencti/documentos/`.
+
+### 2026-11-08 (3) — Memoria: validación externa, ajuste v2, OpenCTI y ML-2 aumentado
+- **Con qué/quién:** Javier (pidió ir pasando a la memoria FA, v2, LAB, la VM, OpenCTI, ML-2 aumentado y los perfiles); Claude Code (redacción y esta entrada).
+- **Cuerpo:** de 46 a **50 páginas** (límite 60). Quedan unas 10 para F5–F9, así que el detalle va a los anexos.
+- **Nueva sección 3.14 «Ampliación del corpus y validación externa»** (`sections/validacion.tex`):
+  - el ajuste v2 y sus cifras en los atómicos;
+  - tabla de los seis conjuntos externos (day2, Zeek, COMISET real, equipo con Atomic Red Team, COMISET LAB y laboratorio propio);
+  - la tasa de falsas alarmas sobre actividad normal (0,95 alertas y 0 campañas por equipo y hora);
+  - la decisión de adoptar v2, manteniendo v1 como cifras de referencia, y sus límites.
+- **Nuevo anexo G «Detalle de la validación externa»:** carga aislada, censo y selección de COMISET, ruido de las etiquetas de LAB, adaptador del laboratorio propio (zona horaria e identidad), reconstrucción del etiquetado y pérdida de `run-lab.ps1`, alertas por ventana y reinicio de la línea base.
+- **Plano CTI (3.15):**
+  - valor añadido medido de OpenCTI (deduplicación y caducidad), su conector de documentos (0 técnicas) y la decisión;
+  - el aumento de ML-2, con su regla de no inferioridad y su resultado;
+  - los perfiles de 15 informes y 8 actores, con una precisión media de 0,73 en actores nuevos.
+- **Anexo de ML-2:** tabla de la validación cruzada aumentada, perfil de APT29 regenerado y tabla por actor.
+- **Retoques:**
+  - Pilar A: trabajo pendiente y límites, ahora con referencias a 3.14;
+  - el laboratorio (3.12) ya está integrado;
+  - Resultados remite a 3.14;
+  - trabajo futuro: cobertura de reglas de elevación;
+  - anexo de reproducibilidad: Neo4j en uso, OpenCTI opcional y los topics de FA y v2;
+  - bibliografía: COMISET (Zenodo, Data in Brief 2025) y Atomic Red Team.
+- Compila sin referencias sin resolver ni líneas desbordadas.

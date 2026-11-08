@@ -187,3 +187,59 @@ técnica del perfil es una relación \texttt{uses} de G0016 con su confianza, el
 de informes que la respaldan, el método que la extrajo y una frase de evidencia. La confianza es
 la probabilidad máxima del modelo; cuando la técnica solo la extrae el diccionario, se usa 61, su
 precisión en la validación cruzada.
+
+\section{Aumento con procedimientos de ATT\&CK}
+
+Las 343 frases de procedimiento (189 de \texttt{T1003}, 74 de \texttt{T1548} y 80 de
+\texttt{T1569}) salen de las relaciones de uso de ATT\&CK v19.2, sin las de APT29 ni sus campañas.
+Solo entran en el entrenamiento de cada vuelta y nunca se predicen. Los dos brazos usan los mismos
+cinco bloques, semillas, época, umbral y diccionario podado, así que solo cambia el modelo. El
+brazo sin aumento reproduce exactamente la validación cruzada adoptada.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|c|c|c|}
+\hline
+\textbf{Sistema (86 informes, 59 técnicas)} & \textbf{F1 frase} & \textbf{P} & \textbf{R} & \textbf{F1 macro} & \textbf{F1 informe} \\
+\hline
+Modelo & 0,481 & 0,585 & 0,408 & 0,206 & 0,620 \\
+Modelo $\cup$ diccionario & 0,520 & 0,569 & 0,480 & 0,382 & 0,695 \\
+Modelo aumentado & 0,470 & 0,615 & 0,380 & 0,199 & 0,607 \\
+\textbf{Modelo aumentado $\cup$ diccionario} & \textbf{0,518} & \textbf{0,593} & \textbf{0,460} & \textbf{0,382} & \textbf{0,700} \\
+\hline
+\end{tabular}
+\caption{Validación cruzada del aumento. Diferencia de las uniones: $-0{,}002$ por frase
+[$-0{,}018$, $+0{,}013$] y $+0{,}005$ por informe [$-0{,}012$, $+0{,}022$].}
+\end{table}
+
+El modelo aumentado gana precisión y pierde algo de exhaustividad, sin diferencia significativa
+($-0{,}011$ por frase), y el diccionario lo compensa en la unión. El perfil de APT29 regenerado con el
+sistema aumentado tiene 22 técnicas: entra \texttt{T1548} y sale \texttt{T1055}, y el F1 frente a
+G0016 y sus campañas pasa de 0,655 a 0,667, con precisión 0,86.
+
+\section{Perfiles de los otros actores}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{|l|l|r|r|r|c|c|c|}
+\hline
+\textbf{Nombre de Microsoft} & \textbf{Grupo de ATT\&CK} & \textbf{Técnicas} & \textbf{Ficha} & \textbf{Aciertos} & \textbf{P} & \textbf{R} & \textbf{F1} \\
+\hline
+Forest Blizzard & G0007 APT28 & 8 & 33 & 5 & 0,63 & 0,15 & 0,24 \\
+Mint Sandstorm & G0059 Magic Hound & 8 & 35 & 6 & 0,75 & 0,17 & 0,28 \\
+Peach Sandstorm & G0064 APT33 & 4 & 18 & 2 & 0,50 & 0,11 & 0,18 \\
+Octo Tempest & G1015 Scattered Spider & 5 & 26 & 4 & 0,80 & 0,15 & 0,26 \\
+Volt Typhoon & G1017 Volt Typhoon & 9 & 35 & 7 & 0,78 & 0,20 & 0,32 \\
+Storm-1811 & G1046 Storm-1811 & 8 & 14 & 5 & 0,63 & 0,36 & 0,45 \\
+Storm-0501 & G1053 Storm-0501 & 9 & 18 & 9 & 1,00 & 0,50 & 0,67 \\
+\hline
+\end{tabular}
+\caption{Perfil extraído de un informe frente a la ficha del grupo con sus campañas, dentro del
+espacio de 62 técnicas.}
+\end{table}
+
+Los actores menos documentados tienen fichas más cortas, y un solo informe cubre una parte mayor
+de ellas. Storm-0558, que no tiene grupo en ATT\&CK, y el informe sobre ransomware operado por
+personas, que trata de varios actores, entran en el grafo solo como informes. Aquí se repite la
+circularidad de APT29: las fichas de ATT\&CK citan en parte estos mismos informes.

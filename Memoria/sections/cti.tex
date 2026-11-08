@@ -64,9 +64,20 @@ El coste no es lo más relevante; la \textbf{fidelidad}, sí. OpenCTI descarta l
 revocadas y sus relaciones de sustitución, que son justo lo que permite traducir identificadores
 antiguos. Además fusiona grupos y malware que comparten un alias (por ejemplo, Ember Bear con Saint
 Bear) y no importa las estrategias de detección ni las analíticas de ATT\&CK v18 en adelante.
-Conserva intactas las relaciones de uso, mitigación y atribución. Por eso \textbf{la referencia
-del sistema es la carga directa}, y OpenCTI queda como capa opcional para el analista y para la
-gestión de indicadores, cuyo valor añadido se mide aparte.
+Conserva intactas las relaciones de uso, mitigación y atribución.
+
+Su valor añadido está en la \textbf{gestión de indicadores}: deduplica por patrón (134.849 de 135.737)
+y aplica caducidad por tipo (47 días a direcciones IP y URL, 300 a dominios y 460 a ficheros), con la
+que ya ha revocado 4.701 indicadores. Su conector de importación de documentos, en cambio, \textbf{no sirve como línea base de la
+extracción de técnicas}. Se le pasaron las mismas 683 frases de APT29 que a ML-2 y no reconoció
+ninguna técnica, porque solo las identifica cuando el texto escribe su identificador (en un control
+con las tablas del editor encontró 13 de 14). Sí reconoce entidades: el grupo, la campaña y 15
+familias de malware, con falsos positivos por nombres genéricos.
+
+\textbf{Decisión}: la carga directa es la capa CTI del sistema, tanto en el despliegue completo como
+en el mínimo, y el Pilar~B la necesita de todos modos para la analítica de grafos. OpenCTI queda
+como perfil opcional para el analista, fuera del camino de los datos. La caducidad de los
+indicadores por tipo se incorporará al cargador propio cuando la priorización use indicadores.
 
 \subsection{Extracción de técnicas de informes (ML-2)}
 \label{sec:ml2}
@@ -158,7 +169,8 @@ resultante se compara con la ficha de ATT\&CK del grupo y con lo que detectó el
     el perfil extraído cubre 4 de las 5 técnicas de las campañas detectadas, igual que la ficha
     oficial del grupo. La laguna más relevante es estructural: \textbf{el volcado de credenciales
     (\texttt{T1003}), núcleo del patrón P1, no está entre las 59 etiquetas}, porque el espacio sale
-    de la frecuencia en AnnoCTR y no de lo que detecta el sistema.
+    de la frecuencia en AnnoCTR y no de lo que detecta el sistema. El aumento descrito más abajo
+    la cierra.
     \item \textbf{Parecido entre campaña y actor}: se ordenaron los 173 grupos de ATT\&CK por parecido
     de técnicas con las campañas detectadas. G0016 no aparece arriba con ninguna de las medidas
     fijadas: queda entre el puesto 39 y el 85, y ni siquiera con la verdad del plan de emulación
@@ -170,5 +182,26 @@ resultante se compara con la ficha de ATT\&CK del grupo y con lo que detectó el
 Este último bloque tiene una circularidad que se declara: la ficha de G0016 se construye en parte
 con estos mismos informes, y AnnoCTR incluye informes de APT29, de otros editores, en
 entrenamiento. Coincidir con la ficha es esperable y no prueba que el modelo generalice; eso lo
-prueba la evaluación sobre AnnoCTR. El perfil se exporta en STIX~2.1, con la confianza, la
-evidencia y el método de cada técnica, y se carga en el grafo con el mismo cargador que ATT\&CK.
+prueba la evaluación sobre AnnoCTR.
+
+\medskip\noindent\textbf{Aumento con procedimientos de ATT\&CK.} Para cerrar la laguna, se añadieron
+al entrenamiento 343 frases de ejemplos de procedimiento de ATT\&CK. Son las descripciones de cómo
+cada grupo o programa usa el volcado de credenciales (\texttt{T1003}), la elevación abusando de
+mecanismos de control (\texttt{T1548}) o los servicios del sistema (\texttt{T1569}). Se excluyó
+APT29 y sus campañas, para no filtrar información hacia la evaluación del perfil. AnnoCTR no puede
+medir lo que se gana, porque esas técnicas apenas aparecen en él (2, 2 y 0 frases). Lo que sí puede
+medir es si se pierde algo en las 59 técnicas de siempre. La decisión se tomó con la misma
+validación cruzada y una regla de no inferioridad fijada antes de entrenar: el aumento se adopta si
+el límite inferior del intervalo de la diferencia en F1 por frase no baja de $-0{,}02$. La diferencia
+fue de $-0{,}002$, con un intervalo de [$-0{,}018$, $+0{,}013$]. \textbf{El sistema adoptado pasa a ser el
+aumentado}, con un espacio de 62 técnicas que ya incluye las tres centrales del Pilar~A.
+
+\medskip\noindent\textbf{Perfiles en el grafo.} Cada perfil se exporta en STIX~2.1, con la confianza,
+la evidencia y el método de cada técnica, y se carga en el grafo con el mismo cargador que
+ATT\&CK. Además de los seis informes de APT29 se procesaron los otros nueve del corpus de Microsoft.
+El actor de cada informe se resuelve por coincidencia exacta de alias con un grupo de ATT\&CK; hay
+siete que la tienen. En el grafo quedan \textbf{15 informes y perfiles de 8 actores}. En los siete
+actores nuevos, con un solo informe por actor, la \textbf{precisión media frente a su ficha es de
+0,73}, entre 0,50 y 1,00: lo que se extrae casi siempre está en la ficha. La exhaustividad es baja,
+entre 0,11 y 0,50, porque un informe cubre solo una parte de lo que la ficha acumula de muchas
+fuentes (Anexo~\ref{anx:ml2}).

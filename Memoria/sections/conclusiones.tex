@@ -22,6 +22,11 @@ identificadas hasta ahora se recogen a continuación.
     que la arquitectura generaliza: una fuente nueva solo requiere un mapeador al esquema OCSF
     y sus reglas. Esta línea está planificada como ampliación condicionada a que el núcleo del
     trabajo esté cerrado a finales de febrero.
+    \item \textbf{Cobertura de reglas para la elevación de privilegios.} La validación externa
+    encontró dos falsos negativos que no se deben a los patrones sino a las reglas: la elevación por
+    explotación de un servicio y la inyección de código bloqueada por el antivirus. Una regla
+    propia, por ejemplo para el reconocimiento ejecutado como SYSTEM desde una aplicación de
+    usuario, cerraría el primero.
     \item \textbf{Señuelos.} Desplegar credenciales y recursos señuelo en la red real, con una
     tasa de falsos positivos casi nula. Una credencial señuelo empleada tras un volcado de LSASS
     reforzaría el patrón de robo de credenciales. Los señuelos expuestos a Internet muestran

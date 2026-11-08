@@ -387,7 +387,7 @@ Tres límites acotan estas cifras:
 \begin{itemize}
     \item Las capturas atómicas son todas actividad maliciosa, así que miden sobre todo la
     \textbf{confusión entre patrones}, no las falsas alarmas sobre actividad legítima. Esa
-    tasa requiere tráfico benigno etiquetado y se medirá en la evaluación final.
+    tasa se midió después sobre una red real (Sección~\ref{sec:validacion-externa}).
     \item La revisión es manual y la hizo el autor. Por eso el anexo recoge la evidencia de
     cada caso, para que la clasificación pueda auditarse.
     \item No se ha medido la \textbf{latencia de detección}: el corpus se reproduce decenas
@@ -409,13 +409,14 @@ Quedan como trabajo posterior:
 
 \begin{itemize}
     \item Una \textbf{segunda versión de los patrones} que descarte el ruido del sistema
-    operativo y corrija la lectura de las cuatro reglas problemáticas. Se medirá aparte y se
-    presentará frente a las cifras de esta sección, que son las de referencia, para no
-    ajustar los patrones a los mismos datos con que se evalúan.
+    operativo y corrija la lectura de las reglas problemáticas. Se mide aparte, frente a las
+    cifras de esta sección, que son las de referencia, y se valida en datos no vistos
+    (Sección~\ref{sec:pilarA-v2}).
     \item Resolver el \textbf{punto ciego del etiquetado}: el 27,1\,\% de las alertas no lleva
     técnica ATT\&CK y es invisible para la correlación por construcción.
-    \item En la evaluación final: la latencia de detección, la tasa de falsas alarmas sobre
-    tráfico benigno y el segundo día de APT29.
+    \item La tasa de falsas alarmas sobre actividad legítima y el segundo día de APT29, ya
+    medidos (Sección~\ref{sec:validacion-externa}); en la evaluación final, la latencia de
+    detección.
     \item Emitir las campañas en flujo hacia un destino que admita actualizaciones y llevar
     los eventos tardíos a su cola propia.
 \end{itemize}
