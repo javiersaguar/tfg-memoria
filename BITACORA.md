@@ -1749,3 +1749,34 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
   - En el equipo con ataques simulados salen 530 alertas por hora y 4 campañas.
 - **Grafana:** el cuadro 6 separa `fa_art` de la actividad normal.
 - **Archivos tocados:** `detection/evaluation/{fa_comiset_v2_extract.py,fa_comiset_v2_select.py,fa_prepare_sources.py,verdad_datasets.csv}`, `infra/docker-compose.yml` (ulimits de Redpanda), `infra/grafana/generar_dashboards.py` y los JSON regenerados, `docs/ROADMAP.md` (FA.3); fuera de git, `data/external/comiset/{real-v2-censo,real-sample-v2}/` y `data/fa/*comiset-v2*`.
+
+### 2026-11-08 (1) — v2 en Flink, COMISET LAB y laboratorio propio (fa_vm): v2 validada
+- **Con qué/quién:** Javier (aprobó el orden LAB → v2 en Flink → validación → cierre de F4 → F5, y meter la VM aparte como `fa_vm`); Claude Code (implementación, cargas nocturnas, análisis y esta entrada).
+- **v2 en Flink:** `detection/evaluation/v2_flink.py` repite la detección con la semántica corregida y los patrones v2 sobre topics aislados (`det.v2.<grupo>.*`, grupos `fa-v2-*`). Las campañas van a `tfg.campaigns_v2`; `tfg.alerts` y `tfg.campaigns` (cifras oficiales v1) no cambian.
+- **COMISET LAB:**
+  - 12 horas de ataque y 6 de control, 600.218 eventos, F3 intacto. Un único equipo detecta despacio (255 ev/s con v1, ~90 con v2), así que se añadió `fa_execute.py --resume`.
+  - **v1 = v2: 85 alertas y 0 campañas; 0 alertas en control.**
+  - Las etiquetas de LAB son sobre todo ruido de sus reglas (explorer → taskmgr como «inyección»), pero hay un ataque real: la explotación de Remote Mouse da una consola SYSTEM. Se alerta (2 altas), pero P3 no abre campaña porque ninguna regla cubre la elevación. Es un falso negativo de cobertura y no se ajusta sobre el conjunto de validación.
+- **Laboratorio propio (F2.3, origen `fa_vm`):**
+  - La VM se había borrado. Los datos están en `data/emulation-lab/` y en `VBoxShared`.
+  - `emulation/label_dataset.py` está reconstruido y reproduce el CSV final fila a fila (14.895 eventos). `run-lab.ps1` se perdió.
+  - Nuevo adaptador `pipeline/normalize/vm_lab.py`, con 5 tests: pasa la hora local a UTC comprobándola contra `UtcTime`, y usa la línea de origen como identidad.
+  - Dos datasets, con el corte a las 09:00 UTC: ataque (7.484 eventos) y base (7.461).
+  - **v1 = v2 (las mismas 886 alertas por `alert_id`).** El ataque da **P1 = VP**, con 19 evidencias (procdump/comsvcs sobre LSASS, limpieza con fsutil y descarga de procdump), y P2/P3 = VN. La base da 0 campañas en 5 h 49 min.
+  - Tres técnicas de cuatro tienen alertas específicas en su ventana. T1055 no tiene ninguna: Defender bloqueó los tests y no hay regla para lo que queda.
+  - La campaña arranca 13 min antes por un `reg export` de T1547.001 que dispara «Dumping of Sensitive Hives».
+  - La base incluye un reinicio (10:47 UTC) en el que se ejecuta la persistencia que dejó T1547.001 (6 alertas altas). Son verdaderos positivos, no falsas alarmas.
+- **Conclusión:** v2 no añade falsas alarmas en datos no vistos y P1 reconoce el único ataque con verdad independiente de reglas. **Se adopta v2 como versión actual para F5 y el portal; las cifras v1 de F3 quedan como las oficiales históricas.**
+- **Pendiente:**
+  - decisión escrita de OpenCTI (F4.2);
+  - validación cruzada de ML-2 aumentado (GPU), perfil STIX y Neo4j;
+  - pasar LAB, VM y v2 a la memoria;
+  - `fa_lab`/`fa_vm` en Grafana;
+  - `autoMemoryReclaim` en `.wslconfig`;
+  - volver a levantar los contenedores parados (neo4j, grafana, prometheus, mlflow, portal y redpanda-console).
+- **Archivos tocados:**
+  - `detection/evaluation/{v2_flink.py,fa_execute.py,fa_prepare_sources.py,fa_comiset_lab_*.py,verdad_datasets.csv}`;
+  - `pipeline/normalize/{vm_lab.py,test_vm_lab.py,fa_registry.py}`;
+  - `emulation/{label_dataset.py,export-events-clean.ps1}`;
+  - `docs/ROADMAP.md` (F2.3, F3.5, FA.0, FA.3 y FA.3b);
+  - fuera de git, `data/fa/*lab*`, `data/fa/v2-flink/` y `data/emulation-lab/origen-vboxshared/`.
